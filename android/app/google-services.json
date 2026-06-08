@@ -1,0 +1,166 @@
+{
+  "project_info": {
+    "project_number": "419337772453",
+    "project_id": "freshrun-cfcfb",
+    "storage_bucket": "freshrun-cfcfb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:419337772453:android:a37beb4295243e60b49c4c",
+        "android_client_info": {
+          "package_name": "com.freshrun"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "419337772453-i7nlai3i6dj0nkvkjebnfcrvpk2amebk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.freshrun",
+            "certificate_hash": "bca739906a50191bbe3fd6b7df2b6e43692c4902"
+          }
+        },
+        {
+          "client_id": "419337772453-l4btemofi2lt8ke1ar5k86nh4ggc1e6l.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.freshrun",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "419337772453-35hfs87m44onoh78164g187h32l65qb5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbUqfS0RrXO9cSJkcRk_x1e9kv9vkQpqU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "419337772453-35hfs87m44onoh78164g187h32l65qb5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "419337772453-4fk8agc8k0306jf0ejrkd7rs8sfeehgv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "org.reactjs.native.example.FreshRun"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:419337772453:android:0435e19efc68fbf9b49c4c",
+        "android_client_info": {
+          "package_name": "com.freshrunadmin"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "419337772453-e3qk28aus5kmjabsdu6g4sm5590migs8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.freshrunadmin",
+            "certificate_hash": "9208fee2456b44086a7da6fd087118b53f28462a"
+          }
+        },
+        {
+          "client_id": "419337772453-vlfgsf5har4t9h4c07m3q79pon7vb57e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.freshrunadmin",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "419337772453-35hfs87m44onoh78164g187h32l65qb5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbUqfS0RrXO9cSJkcRk_x1e9kv9vkQpqU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "419337772453-35hfs87m44onoh78164g187h32l65qb5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "419337772453-4fk8agc8k0306jf0ejrkd7rs8sfeehgv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "org.reactjs.native.example.FreshRun"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:419337772453:android:8cbe2240db0e3261b49c4c",
+        "android_client_info": {
+          "package_name": "com.freshrundeliverypartner"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "419337772453-7ijqnbamerpa3sapc67m24565gbej27l.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.freshrundeliverypartner",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "419337772453-do1phgvt00526ooqdu98tisk1863jdcf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.freshrundeliverypartner",
+            "certificate_hash": "9208fee2456b44086a7da6fd087118b53f28462a"
+          }
+        },
+        {
+          "client_id": "419337772453-35hfs87m44onoh78164g187h32l65qb5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbUqfS0RrXO9cSJkcRk_x1e9kv9vkQpqU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "419337772453-35hfs87m44onoh78164g187h32l65qb5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "419337772453-4fk8agc8k0306jf0ejrkd7rs8sfeehgv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "org.reactjs.native.example.FreshRun"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
