@@ -10,9 +10,10 @@ import {
   ScrollView,
   ActivityIndicator,
   StatusBar,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Landmark, CreditCard, User, Info } from 'lucide-react-native';
+import { ChevronLeft, User, Info, Camera, Trash2 } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../theme/colors';
 import { Fonts } from '../theme/typography';
@@ -21,6 +22,10 @@ import { Alertt } from '../components/Alertt';
 import { API_BASE_URL } from '../config/api';
 import { PageTitle, PageSubtitle } from '../components/Typography';
 import { PrimaryButton } from '../components/Button';
+import { launchImageLibrary } from 'react-native-image-picker';
+
+const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dubgo0vue/image/upload";
+const UPLOAD_PRESET = "freshrun_preset";
 
 interface PaymentOnboardingScreenProps {
   onBack: () => void;
@@ -35,31 +40,65 @@ const PaymentOnboardingScreen: React.FC<PaymentOnboardingScreenProps> = ({
   userData, 
   storeData 
 }) => {
-  const [accountNumber, setAccountNumber] = useState('');
-  const [confirmAccountNumber, setConfirmAccountNumber] = useState('');
-  const [ifscCode, setIfscCode] = useState('');
-  const [panNumber, setPanNumber] = useState('');
+  const [upiId, setUpiId] = useState('');
+  const [upiQrImage, setUpiQrImage] = useState<string | null>(null);
+  const [qrUploading, setQrUploading] = useState(false);
   const [businessName, setBusinessName] = useState(storeData?.name || '');
   const [loading, setLoading] = useState(false);
 
+  const handleSelectQrImage = async () => {
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      quality: 0.7,
+    });
+    if (result.assets && result.assets[0].uri) {
+      uploadQrToCloudinary(result.assets[0]);
+    }
+  };
+
+  const uploadQrToCloudinary = async (asset: any) => {
+    setQrUploading(true);
+    try {
+      const data = new FormData();
+      data.append('file', {
+        uri: asset.uri,
+        type: asset.type || 'image/jpeg',
+        name: asset.fileName || 'upload.jpg',
+      } as any);
+      data.append('upload_preset', UPLOAD_PRESET);
+
+      console.log('Uploading QR code to Cloudinary:', CLOUDINARY_URL);
+      const response = await fetch(CLOUDINARY_URL, {
+        method: 'POST',
+        body: data,
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Cloudinary status: ${response.status} - ${errText}`);
+      }
+
+      const resData = await response.json();
+
+      if (resData.secure_url) {
+        setUpiQrImage(resData.secure_url);
+      }
+    } catch (error: any) {
+      console.error('[CloudinaryUpload QR] error:', error.message || error);
+      Alertt.alert('Upload Failed', 'Could not upload image. Please try again.');
+    } finally {
+      setQrUploading(false);
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!accountNumber || !ifscCode || !panNumber || !businessName) {
-      Alertt.alert('Error', 'Please fill in all bank details, PAN, and business name.');
+    if (!upiId.trim() || !upiQrImage || !businessName.trim()) {
+      Alertt.alert('Error', 'Please fill in all UPI details and registered name.');
       return;
     }
 
-    if (accountNumber !== confirmAccountNumber) {
-      Alertt.alert('Error', 'Account numbers do not match.');
-      return;
-    }
-
-    if (ifscCode.length !== 11) {
-      Alertt.alert('Error', 'Invalid IFSC Code (must be 11 characters).');
-      return;
-    }
-
-    if (panNumber.length !== 10) {
-      Alertt.alert('Error', 'Invalid PAN Number (must be 10 characters).');
+    if (!upiId.includes('@')) {
+      Alertt.alert('Error', 'Please enter a valid UPI ID (e.g. name@okaxis)');
       return;
     }
 
@@ -70,11 +109,8 @@ const PaymentOnboardingScreen: React.FC<PaymentOnboardingScreenProps> = ({
       const response = await axios.post(`${API_BASE_URL}/payments/onboard`, {
         role: 'owner',
         storeId: storeData.id,
-        bankDetails: {
-          accountNumber,
-          ifscCode,
-        },
-        pan: panNumber,
+        upiId,
+        upiQrImage,
         name: userData.fullName || userData.full_name,
         email: userData.email,
         phone: userData.phone,
@@ -84,7 +120,7 @@ const PaymentOnboardingScreen: React.FC<PaymentOnboardingScreenProps> = ({
       });
 
       if (response.data.success) {
-        Alertt.alert('Success', 'Bank details submitted successfully! Razorpay is verifying your account details.');
+        Alertt.alert('Success', 'UPI payment details submitted successfully!');
         onSuccess();
       }
     } catch (error: any) {
@@ -111,7 +147,7 @@ const PaymentOnboardingScreen: React.FC<PaymentOnboardingScreenProps> = ({
           <View style={styles.header}>
             <PageTitle>Payment Connection</PageTitle>
             <PageSubtitle>
-              Set up your settlements with Razorpay to receive earnings directly into your bank account.
+              Set up your settlements to receive store earnings directly via UPI.
             </PageSubtitle>
           </View>
 
@@ -131,86 +167,68 @@ const PaymentOnboardingScreen: React.FC<PaymentOnboardingScreenProps> = ({
               </View>
             </View>
 
-            {/* Bank Account Number */}
+            {/* UPI ID */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Bank Account Number</Text>
-              <View style={styles.inputWrapper}>
-                <Landmark size={20} color={Colors.textLight} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Enter bank account number"
-                  value={accountNumber}
-                  onChangeText={setAccountNumber}
-                  keyboardType="number-pad"
-                  placeholderTextColor={Colors.textLight}
-                />
-              </View>
-            </View>
-
-            {/* Confirm Account Number */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Confirm Account Number</Text>
-              <View style={styles.inputWrapper}>
-                <Landmark size={20} color={Colors.textLight} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Re-enter bank account number"
-                  value={confirmAccountNumber}
-                  onChangeText={setConfirmAccountNumber}
-                  keyboardType="number-pad"
-                  placeholderTextColor={Colors.textLight}
-                />
-              </View>
-            </View>
-
-            {/* IFSC Code */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>IFSC Code</Text>
-              <View style={styles.inputWrapper}>
-                <CreditCard size={20} color={Colors.textLight} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g. HDFC0000123"
-                  value={ifscCode}
-                  onChangeText={text => setIfscCode(text.toUpperCase())}
-                  autoCapitalize="characters"
-                  maxLength={11}
-                  placeholderTextColor={Colors.textLight}
-                />
-              </View>
-            </View>
-
-            {/* PAN Number */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>PAN Card Number</Text>
+              <Text style={styles.label}>UPI ID</Text>
               <View style={styles.inputWrapper}>
                 <User size={20} color={Colors.textLight} style={styles.inputIcon} />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="10-digit PAN"
-                  value={panNumber}
-                  onChangeText={text => setPanNumber(text.toUpperCase())}
-                  autoCapitalize="characters"
-                  maxLength={10}
+                  placeholder="Enter UPI ID (e.g. name@okicici)"
+                  value={upiId}
+                  onChangeText={setUpiId}
+                  autoCapitalize="none"
                   placeholderTextColor={Colors.textLight}
                 />
               </View>
             </View>
 
-            {/* Warning Card */}
+            {/* UPI QR Code Image */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>UPI QR Code Image</Text>
+              {upiQrImage ? (
+                <View style={styles.imagePreviewContainer}>
+                  <Image source={{ uri: upiQrImage }} style={styles.imagePreview} />
+                  <TouchableOpacity 
+                    style={styles.removeImageBtn} 
+                    onPress={() => setUpiQrImage(null)}
+                  >
+                    <Trash2 size={16} color="#fff" />
+                    <Text style={styles.removeImageText}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.uploadButton} 
+                  onPress={handleSelectQrImage}
+                  disabled={qrUploading}
+                >
+                  {qrUploading ? (
+                    <ActivityIndicator color={Colors.primary} />
+                  ) : (
+                    <>
+                      <Camera size={24} color={Colors.primary} style={{ marginBottom: 8 }} />
+                      <Text style={styles.uploadText}>Upload UPI QR Code Image</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Info Card */}
             <View style={styles.infoCard}>
               <View style={styles.infoHeader}>
                 <Info size={20} color={Colors.secondary} />
                 <Text style={styles.infoTitle}>Verification Note</Text>
               </View>
               <Text style={styles.infoDescription}>
-                All order amounts will be split and settled to this bank account automatically. Ensure details match your bank passbook exactly.
+                All order amounts will be split and settled to this UPI address. Ensure your QR code is clear and matches the UPI ID.
               </Text>
             </View>
           </View>
 
           <PrimaryButton 
-            title={loading ? "Submitting..." : "Submit to Razorpay"}
+            title={loading ? "Submitting..." : "Submit Details"}
             onPress={handleSubmit}
             loading={loading}
           />
@@ -303,6 +321,53 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.regular,
     color: Colors.textSecondary,
     lineHeight: 18,
+  },
+  uploadButton: {
+    height: 120,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: Colors.border,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+  uploadText: {
+    fontSize: 14,
+    fontFamily: Fonts.medium,
+    color: Colors.textLight,
+  },
+  imagePreviewContainer: {
+    width: '100%',
+    height: 180,
+    borderRadius: 15,
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+    backgroundColor: '#f8fafc',
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  removeImageText: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: Fonts.medium,
+    marginLeft: 6,
   },
 });
 

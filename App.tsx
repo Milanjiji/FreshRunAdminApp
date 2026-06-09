@@ -63,8 +63,27 @@ const App = () => {
           }
         }
       }
-    } catch (error) {
-      console.error('Error fetching owner profile & store:', error);
+    } catch (error: any) {
+      console.log('[App.tsx] Error fetching owner profile & store:', error.message);
+      
+      // If the backend returns 404 (user does not exist in DB), sign out of Firebase cleanly (Case 2 fallback)
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        console.warn('[App.tsx] Authenticated Firebase user does not exist in database. Signing out...');
+        try {
+          await auth().signOut();
+        } catch (signOutErr) {
+          console.error('[App.tsx] Firebase signOut failed:', signOutErr);
+        }
+        
+        // Clear credentials and reset states
+        storage.removeItem('userToken');
+        storage.removeItem('userData');
+        storage.removeItem('storeData');
+        
+        setUserData(null);
+        setStoreData(null);
+        setShowPaymentSetup(false);
+      }
     } finally {
       setInitializing(false);
     }

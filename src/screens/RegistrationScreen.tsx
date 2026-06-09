@@ -15,6 +15,7 @@ import {
 import { Alertt } from '../components/Alertt';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, ChevronLeft, Trash2, ChevronRight } from 'lucide-react-native';
+import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import axios from 'axios';
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -34,12 +35,12 @@ interface RegistrationScreenProps {
 }
 
 const CATEGORIES = [
-  { label: 'Grocery', value: 'grocery' },
-  { label: 'Fruits & Vegetables', value: 'fruits_veg' },
-  { label: 'Meat & Fish', value: 'meat_fish' },
-  { label: 'Bakery & Sweets', value: 'bakery' },
-  { label: 'Beverages', value: 'beverages' },
-  { label: 'Household Items', value: 'household' }
+  { label: 'Restaurants', value: 'restaurants' },
+  { label: 'Street Food', value: 'street-food' },
+  { label: 'Groceries', value: 'groceries' },
+  { label: 'Chicken', value: 'chicken' },
+  { label: 'Fish', value: 'fish' },
+  { label: 'Medicine', value: 'medicine' }
 ];
 
 const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegisterSuccess }) => {
@@ -48,31 +49,43 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
   const [uploading, setUploading] = useState(false);
 
   // --- Step 1: Owner Details ---
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [aadharNumber, setAadharNumber] = useState('');
-  const [aadharImage, setAadharImage] = useState<string | null>(null);
+  const [fullName, setFullName] = useState('Milan J');
+  const [email, setEmail] = useState('milanjiji0987654321@gmail.com');
+  const [phoneNumber, setPhoneNumber] = useState('7012881004');
+  const [aadharNumber, setAadharNumber] = useState('123456789012');
+  const [aadharImage, setAadharImage] = useState<string | null>('https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg');
 
   // --- Step 2: Store Details ---
-  const [storeName, setStoreName] = useState('');
-  const [storeDescription, setStoreDescription] = useState('');
+  const [storeName, setStoreName] = useState('Milan Fresh Store');
+  const [storeDescription, setStoreDescription] = useState('Fresh fruits and vegetables delivered directly to your doorstep.');
   const [storeCategory, setStoreCategory] = useState(CATEGORIES[0].value);
-  const [storePhone, setStorePhone] = useState('');
-  const [storeImage, setStoreImage] = useState<string | null>(null);
-  const [houseNumber, setHouseNumber] = useState('');
-  const [addressLine, setAddressLine] = useState('');
-  const [landmark, setLandmark] = useState('');
-  const [pincode, setPincode] = useState('');
+  const [storePhone, setStorePhone] = useState('7012881004');
+  const [storeImage, setStoreImage] = useState<string | null>('https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg');
+  const [houseNumber, setHouseNumber] = useState('Flat 4B');
+  const [addressLine, setAddressLine] = useState('Calicut Bypass Road');
+  const [landmark, setLandmark] = useState('Near Cyberpark');
+  const [pincode, setPincode] = useState('673016');
   const [city, setCity] = useState('Calicut');
-  const [gstNumber, setGstNumber] = useState('');
+  const [gstNumber, setGstNumber] = useState('32ABCDE1234F1Z5');
+  const [latitude, setLatitude] = useState(11.2588);
+  const [longitude, setLongitude] = useState(75.7804);
 
-  // --- Step 3: Bank Details ---
-  const [bankAccount, setBankAccount] = useState('');
-  const [confirmBankAccount, setConfirmBankAccount] = useState('');
-  const [ifscCode, setIfscCode] = useState('');
-  const [panCard, setPanCard] = useState('');
-  const [businessName, setBusinessName] = useState('');
+  // --- Map Selection ---
+  const [showMap, setShowMap] = useState(false);
+  const [tempLatitude, setTempLatitude] = useState(11.2588);
+  const [tempLongitude, setTempLongitude] = useState(75.7804);
+
+  const handleOpenMap = () => {
+    setTempLatitude(latitude);
+    setTempLongitude(longitude);
+    setShowMap(true);
+  };
+
+  // --- Step 3: UPI Details ---
+  const [upiId, setUpiId] = useState('');
+  const [upiQrImage, setUpiQrImage] = useState<string | null>(null);
+  const [qrUploading, setQrUploading] = useState(false);
+  const [businessName, setBusinessName] = useState('Milan J');
 
   // --- Step 4: OTP Verification ---
   const [confirm, setConfirm] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
@@ -91,7 +104,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
   }, [timer]);
 
   // Handle image pick & upload to Cloudinary
-  const handleSelectImage = async (type: 'aadhar' | 'store') => {
+  const handleSelectImage = async (type: 'aadhar' | 'store' | 'qr') => {
     console.log(`[RegistrationScreen] Selecting image for ${type} using launchImageLibrary...`);
     const result = await launchImageLibrary({
       mediaType: 'photo',
@@ -109,8 +122,12 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
     }
   };
 
-  const uploadToCloudinary = async (asset: any, type: 'aadhar' | 'store') => {
-    setUploading(true);
+  const uploadToCloudinary = async (asset: any, type: 'aadhar' | 'store' | 'qr') => {
+    if (type === 'qr') {
+      setQrUploading(true);
+    } else {
+      setUploading(true);
+    }
     console.log(`[RegistrationScreen] Initiating Cloudinary upload to preset '${UPLOAD_PRESET}' for ${type}...`);
     try {
       const data = new FormData();
@@ -135,17 +152,21 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
         console.log(`[RegistrationScreen] Cloudinary upload successful. URL: ${resData.secure_url}`);
         if (type === 'aadhar') {
           setAadharImage(resData.secure_url);
-          Alertt.alert('Success', 'Aadhar Card photo uploaded!');
-        } else {
+        } else if (type === 'store') {
           setStoreImage(resData.secure_url);
-          Alertt.alert('Success', 'Store banner photo uploaded!');
+        } else if (type === 'qr') {
+          setUpiQrImage(resData.secure_url);
         }
       }
     } catch (error: any) {
       console.error('[RegistrationScreen] [Error] Cloudinary upload failed:', error);
       Alertt.alert('Upload Failed', 'Could not upload image. Please try again.');
     } finally {
-      setUploading(false);
+      if (type === 'qr') {
+        setQrUploading(false);
+      } else {
+        setUploading(false);
+      }
     }
   };
 
@@ -229,26 +250,16 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
 
   // Step 3 Validation & Sending OTP (Stage 1, Step 4)
   const handleNextStep3 = async () => {
-    console.log('[RegistrationScreen] [Step 3 Validate] Bank Account:', bankAccount, 'IFSC:', ifscCode, 'PAN:', panCard, 'Business Name:', businessName);
+    console.log('[RegistrationScreen] [Step 3 Validate] UPI ID:', upiId, 'UPI QR:', upiQrImage, 'Business Name:', businessName);
     
-    if (!bankAccount.trim() || !confirmBankAccount.trim() || !ifscCode.trim() || !panCard.trim() || !businessName.trim()) {
+    if (!upiId.trim() || !upiQrImage || !businessName.trim()) {
       console.warn('[RegistrationScreen] Step 3 validation failed: Missing fields.');
-      Alertt.alert('Error', 'Please fill in all bank account details.');
+      Alertt.alert('Error', 'Please enter your UPI ID, upload UPI QR Code image, and enter registered name.');
       return;
     }
-    if (bankAccount !== confirmBankAccount) {
-      console.warn('[RegistrationScreen] Step 3 validation failed: Account numbers mismatch.');
-      Alertt.alert('Error', 'Account numbers do not match.');
-      return;
-    }
-    if (ifscCode.length !== 11) {
-      console.warn('[RegistrationScreen] Step 3 validation failed: IFSC is not 11 chars.');
-      Alertt.alert('Error', 'IFSC Code must be 11 characters.');
-      return;
-    }
-    if (panCard.length !== 10) {
-      console.warn('[RegistrationScreen] Step 3 validation failed: PAN is not 10 chars.');
-      Alertt.alert('Error', 'PAN Card number must be 10 characters.');
+    if (!upiId.includes('@')) {
+      console.warn('[RegistrationScreen] Step 3 validation failed: Invalid UPI ID format.');
+      Alertt.alert('Error', 'Please enter a valid UPI ID (e.g. name@okaxis)');
       return;
     }
 
@@ -262,7 +273,6 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
       setConfirm(confirmation);
       setTimer(30);
       setStep(4);
-      Alertt.alert('Verification Sent', 'Please enter the 6-digit verification code.');
     } catch (error: any) {
       console.error('[RegistrationScreen] [Error] Failed to send OTP for registration:', error);
       Alertt.alert('Error', error.message || 'Failed to send verification code.');
@@ -312,8 +322,8 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
         storeLandmark: landmark,
         storePincode: pincode,
         storeCity: city,
-        latitude: 11.2588, // Mock Calicut coordinates default
-        longitude: 75.7804,
+        latitude: latitude,
+        longitude: longitude,
         ownerFullName: fullName,
         ownerEmail: email,
         ownerPhone1: phoneNumber,
@@ -334,18 +344,15 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
         const onboardPayload = {
           role: 'owner',
           storeId: storeData.id,
-          bankDetails: {
-            accountNumber: bankAccount,
-            ifscCode
-          },
-          pan: panCard,
+          upiId,
+          upiQrImage,
           name: fullName,
           email,
           phone: phoneNumber,
           businessName
         };
 
-        console.log('[RegistrationScreen] Submitting onboarding bank info to backend POST /payments/onboard. Payload:', onboardPayload);
+        console.log('[RegistrationScreen] Submitting onboarding UPI info to backend POST /payments/onboard. Payload:', onboardPayload);
         const onboardResponse = await axios.post(
           `${API_BASE_URL}/payments/onboard`,
           onboardPayload,
@@ -383,6 +390,64 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
       setLoading(false);
     }
   };
+
+  if (showMap) {
+    return (
+      <SafeAreaView style={styles.mapSafeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+        
+        {/* Map View */}
+        <View style={styles.mapWrapper}>
+          <MapView
+            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+            style={styles.map}
+            initialRegion={{
+              latitude: tempLatitude,
+              longitude: tempLongitude,
+              latitudeDelta: 0.015,
+              longitudeDelta: 0.015,
+            }}
+            onRegionChangeComplete={(region) => {
+              setTempLatitude(region.latitude);
+              setTempLongitude(region.longitude);
+            }}
+          />
+          
+          {/* Centered marker pin overlay */}
+          <View style={styles.centerMarkerContainer} pointerEvents="none">
+            <View style={styles.centerMarker} />
+            <View style={styles.centerMarkerStem} />
+          </View>
+
+          {/* Floating Back Button */}
+          <TouchableOpacity 
+            style={styles.floatingBackButton} 
+            onPress={() => {
+              console.log('[RegistrationScreen] Map closed without changes.');
+              setShowMap(false);
+            }}
+          >
+            <ChevronLeft size={24} color={Colors.text} strokeWidth={2.5} />
+          </TouchableOpacity>
+
+          {/* Floating Confirm Location Button */}
+          <View style={styles.floatingFooter}>
+            <TouchableOpacity 
+              style={styles.mapConfirmButton}
+              onPress={() => {
+                console.log('[RegistrationScreen] Map location confirmed:', tempLatitude, tempLongitude);
+                setLatitude(tempLatitude);
+                setLongitude(tempLongitude);
+                setShowMap(false);
+              }}
+            >
+              <Text style={styles.mapConfirmButtonText}>Confirm Location</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -666,6 +731,20 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
               </View>
 
               <View style={styles.inputContainer}>
+                <Text style={styles.label}>Store Location</Text>
+                <TouchableOpacity
+                  style={styles.locationSelectorButton}
+                  onPress={handleOpenMap}
+                >
+                  <Text style={styles.locationSelectorText}>
+                    {latitude && longitude
+                      ? `Selected Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`
+                      : "Tap to set store location on map"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputContainer}>
                 <Text style={styles.label}>Upload Store Banner Photo</Text>
                 {storeImage ? (
                   <View style={styles.imagePreviewContainer}>
@@ -706,12 +785,12 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
             </View>
           )}
 
-          {/* Step 3: Bank Details Form */}
+          {/* Step 3: UPI Details Form */}
           {step === 3 && (
             <View style={styles.formSection}>
               <View style={styles.header}>
                 <PageTitle>Settlement Setup</PageTitle>
-                <PageSubtitle>Add bank credentials to split payouts via Razorpay Route.</PageSubtitle>
+                <PageSubtitle>Add your UPI details for automated payouts.</PageSubtitle>
               </View>
 
               <View style={styles.inputContainer}>
@@ -726,53 +805,49 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Bank Account Number</Text>
+                <Text style={styles.label}>UPI ID</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Enter bank account number"
-                  value={bankAccount}
-                  onChangeText={setBankAccount}
-                  keyboardType="number-pad"
+                  placeholder="Enter UPI ID (e.g. name@okaxis)"
+                  value={upiId}
+                  onChangeText={setUpiId}
+                  autoCapitalize="none"
                   placeholderTextColor={Colors.textLight}
                 />
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Confirm Bank Account Number</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Re-enter bank account number"
-                  value={confirmBankAccount}
-                  onChangeText={setConfirmBankAccount}
-                  keyboardType="number-pad"
-                  placeholderTextColor={Colors.textLight}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>IFSC Code</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g. HDFC0000123"
-                  value={ifscCode}
-                  onChangeText={(text) => setIfscCode(text.toUpperCase())}
-                  autoCapitalize="characters"
-                  maxLength={11}
-                  placeholderTextColor={Colors.textLight}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>PAN Card Number</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Enter 10-char PAN"
-                  value={panCard}
-                  onChangeText={(text) => setPanCard(text.toUpperCase())}
-                  autoCapitalize="characters"
-                  maxLength={10}
-                  placeholderTextColor={Colors.textLight}
-                />
+                <Text style={styles.label}>Upload UPI QR Code Image</Text>
+                {upiQrImage ? (
+                  <View style={styles.imagePreviewContainer}>
+                    <Image source={{ uri: upiQrImage }} style={styles.imagePreview} />
+                    <TouchableOpacity 
+                      style={styles.removeImageBtn}
+                      onPress={() => {
+                        console.log('[RegistrationScreen] Clearing picked UPI QR Image.');
+                        setUpiQrImage(null);
+                      }}
+                    >
+                      <Trash2 size={16} color="#fff" />
+                      <Text style={styles.removeImageText}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity 
+                    style={styles.uploadButton} 
+                    onPress={() => handleSelectImage('qr')}
+                    disabled={qrUploading}
+                  >
+                    {qrUploading ? (
+                      <ActivityIndicator color={Colors.primary} />
+                    ) : (
+                      <>
+                        <Camera size={28} color={Colors.textLight} style={{ marginBottom: 8 }} />
+                        <Text style={styles.uploadText}>Select UPI QR Code Image</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
 
               <PrimaryButton
@@ -1065,6 +1140,95 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: Fonts.medium,
     color: Colors.secondary,
+  },
+  mapSafeArea: {
+    flex: 1,
+    backgroundColor: Colors.white,
+  },
+  mapWrapper: {
+    flex: 1,
+    position: 'relative',
+  },
+  map: {
+    ...StyleSheet.absoluteFill,
+  },
+  floatingBackButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20,
+    left: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  floatingFooter: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 40 : 20,
+    left: 20,
+    right: 20,
+    backgroundColor: 'transparent',
+  },
+  mapConfirmButton: {
+    height: 50,
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapConfirmButtonText: {
+    fontFamily: Fonts.bold,
+    fontSize: 16,
+    color: Colors.white,
+  },
+  centerMarkerContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -15,
+    marginTop: -30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
+  centerMarker: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.primary,
+    borderWidth: 3,
+    borderColor: 'white',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  },
+  centerMarkerStem: {
+    width: 2,
+    height: 10,
+    backgroundColor: Colors.primary,
+    marginTop: -1,
+  },
+  locationSelectorButton: {
+    height: 50,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    justifyContent: 'center',
+    backgroundColor: Colors.white,
+  },
+  locationSelectorText: {
+    fontFamily: Fonts.medium,
+    fontSize: 14,
+    color: Colors.primary,
   },
 });
 

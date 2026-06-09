@@ -78,7 +78,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onNavigateToR
       
       setConfirm(confirmation);
       setTimer(30); // 30 seconds countdown
-      Alertt.alert('OTP Sent', 'A 6-digit verification code has been sent to your phone.');
     } catch (error: any) {
       console.error('[LoginScreen] [Error] Send OTP failed:', error);
       Alertt.alert('Error', error.message || 'Failed to send OTP. Please try again.');
