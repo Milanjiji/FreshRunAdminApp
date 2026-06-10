@@ -119,4 +119,5 @@ dependencies {
 }
 
 apply plugin: "com.google.gms.google-services"
+apply from: "../../node_modules/@revopush/react-native-code-push/android/codepush.gradle"
 
