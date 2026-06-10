@@ -21,6 +21,27 @@ import PaymentOnboardingScreen from './src/screens/PaymentOnboardingScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import { API_BASE_URL } from './src/config/api';
 
+// Intercept Axios requests to inject fresh Firebase ID token
+axios.interceptors.request.use(async (config) => {
+  if (config.url?.startsWith(API_BASE_URL)) {
+    try {
+      const currentUser = auth().currentUser;
+      if (currentUser) {
+        const token = await currentUser.getIdToken(false);
+        if (token) {
+          config.headers = config.headers || {};
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      }
+    } catch (error) {
+      console.error('[Axios Interceptor] Error injecting token:', error);
+    }
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
 const App = () => {
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
@@ -159,11 +180,20 @@ const App = () => {
     }
   }, []);
 
-  // Handle Firebase auth state changes
-  const onAuthStateChanged = useCallback((firebaseUser: FirebaseAuthTypes.User | null) => {
+  // Handle Firebase auth/token changes
+  const onIdTokenChanged = useCallback(async (firebaseUser: FirebaseAuthTypes.User | null) => {
     setUser(firebaseUser);
     if (firebaseUser) {
-      fetchOwnerProfileAndStore(firebaseUser);
+      try {
+        const token = await firebaseUser.getIdToken();
+        storage.setItem('userToken', token);
+      } catch (e) {
+        console.error('Error updating refreshed token in storage:', e);
+      }
+
+      if (initializing) {
+        fetchOwnerProfileAndStore(firebaseUser);
+      }
     } else {
       // Clear local storage
       storage.removeItem('userToken');
@@ -178,12 +208,12 @@ const App = () => {
       setShowPaymentSetup(false);
       setInitializing(false);
     }
-  }, [fetchOwnerProfileAndStore]);
+  }, [fetchOwnerProfileAndStore, initializing]);
 
   useEffect(() => {
-    const subscriber = auth().onAuthStateChanged(onAuthStateChanged);
+    const subscriber = auth().onIdTokenChanged(onIdTokenChanged);
     return subscriber; // unsubscribe on unmount
-  }, [onAuthStateChanged]);
+  }, [onIdTokenChanged]);
 
   const handleLoginSuccess = (data: any) => {
     setUserData(data);
