@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">FreshRunAdmin</string>
+    <string name="app_name">FreshRush Admin</string>
     <!-- Staging: qVWxqbjX-nol0kAIRHEzcCfwOa0M4yGGSh3g4g -->
     <!-- Production: TfsxK_wizBmRskvq3YC9H31Jr-ET4yGGSh3g4g -->
     <string name="CodePushDeploymentKey" translatable="false">qVWxqbjX-nol0kAIRHEzcCfwOa0M4yGGSh3g4g</string>

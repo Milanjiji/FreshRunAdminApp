@@ -137,7 +137,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onNavigateToR
         
         Alertt.alert(
           'Access Denied',
-          'This phone number is not registered as a store owner on FreshRun. Please contact the administrator to create your store registration first.'
+          'This phone number is not registered as a store owner on FreshRush. Please contact the administrator to create your store registration first.'
         );
       }
     } catch (error: any) {

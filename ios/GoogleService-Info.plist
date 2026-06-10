@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CLIENT_ID</key>
+	<string>419337772453-5ee7lu6d1069i94hqa6pp17lll6jvger.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.419337772453-5ee7lu6d1069i94hqa6pp17lll6jvger</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>419337772453-7ijqnbamerpa3sapc67m24565gbej27l.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyDCPnZ0rUaMLg83JSo-xkeE6KVlBfl4NuA</string>
 	<key>GCM_SENDER_ID</key>
@@ -9,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>org.reactjs.native.example.FreshRun</string>
+	<string>org.reactjs.native.example.FreshRunAdmin</string>
 	<key>PROJECT_ID</key>
 	<string>freshrun-cfcfb</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:419337772453:ios:727726bd1a875696b49c4c</string>
+	<string>1:419337772453:ios:46b7ba344bfe41b6b49c4c</string>
 </dict>
 </plist>
