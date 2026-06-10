@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import messaging from '@react-native-firebase/messaging';
 import axios from 'axios';
 import { Colors } from './src/theme/colors';
 import { Fonts } from './src/theme/typography';
@@ -24,9 +25,51 @@ const App = () => {
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
   const [userData, setUserData] = useState<any>(null);
-  const [storeData, setStoreData] = useState<any>(null);
+  const [storeData, setStoreData] = useState<any>(null); // Active store
+  const [storesList, setStoresList] = useState<any[]>([]); // All owner stores
   const [showPaymentSetup, setShowPaymentSetup] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<'login' | 'register'>('login');
+
+  const handleSelectStore = (store: any) => {
+    setStoreData(store);
+    storage.setItem('storeData', store);
+    storage.setItem('activeStoreId', store.id);
+    if (store.razorpay_kyc_status !== 'activated') {
+      setShowPaymentSetup(true);
+    } else {
+      setShowPaymentSetup(false);
+    }
+  };
+
+  const requestUserPermission = async () => {
+    try {
+      const authStatus = await messaging().requestPermission();
+      const enabled =
+        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+      return enabled;
+    } catch (e) {
+      console.log('[App.tsx] FCM Permission request error:', e);
+      return false;
+    }
+  };
+
+  const registerFcmToken = async (userId: string, userToken: string) => {
+    try {
+      const fcmToken = await messaging().getToken();
+      if (fcmToken) {
+        console.log('[App.tsx] FCM Token retrieved:', fcmToken);
+        await axios.post(
+          `${API_BASE_URL}/user/fcm-token`,
+          { token: fcmToken },
+          { headers: { Authorization: `Bearer ${userToken}` } }
+        );
+        console.log('[App.tsx] FCM Token registered on backend successfully.');
+      }
+    } catch (err: any) {
+      console.log('[App.tsx] FCM registration failed:', err.message);
+    }
+  };
 
   // Fetch full store owner profile and their store details
   const fetchOwnerProfileAndStore = useCallback(async (firebaseUser: FirebaseAuthTypes.User) => {
@@ -44,22 +87,46 @@ const App = () => {
         setUserData(profile);
         storage.setItem('userData', profile);
 
-        // 2. Fetch stores and find the store owned by this user
+        // Register FCM Token
+        requestUserPermission().then((hasPermission) => {
+          if (hasPermission) {
+            registerFcmToken(profile.id, token);
+          }
+        });
+
+        // 2. Fetch stores and filter stores owned by this user
         const storesResponse = await axios.get(`${API_BASE_URL}/stores?include_inactive=true&include_pending=true`);
         
         if (storesResponse.data.success && storesResponse.data.data) {
-          const ownerStore = storesResponse.data.data.find(
+          const ownerStores = storesResponse.data.data.filter(
             (s: any) => s.owner_id === profile.id
           );
           
-          if (ownerStore) {
-            setStoreData(ownerStore);
-            storage.setItem('storeData', ownerStore);
+          setStoresList(ownerStores);
+          storage.setItem('storesList', ownerStores);
+          
+          if (ownerStores.length > 0) {
+            // Retrieve last active store ID if exists, otherwise default to first
+            const lastActiveStoreId = storage.getString('activeStoreId');
+            let selectedStore = ownerStores.find((s: any) => s.id === lastActiveStoreId);
+            if (!selectedStore) {
+              selectedStore = ownerStores[0];
+            }
+            
+            setStoreData(selectedStore);
+            storage.setItem('storeData', selectedStore);
+            storage.setItem('activeStoreId', selectedStore.id);
             
             // If store doesn't have an active Razorpay linked account, flag for setup
-            if (ownerStore.razorpay_kyc_status !== 'activated') {
+            if (selectedStore.razorpay_kyc_status !== 'activated') {
               setShowPaymentSetup(true);
+            } else {
+              setShowPaymentSetup(false);
             }
+          } else {
+            setStoreData(null);
+            storage.removeItem('storeData');
+            storage.removeItem('activeStoreId');
           }
         }
       }
@@ -79,9 +146,12 @@ const App = () => {
         storage.removeItem('userToken');
         storage.removeItem('userData');
         storage.removeItem('storeData');
+        storage.removeItem('storesList');
+        storage.removeItem('activeStoreId');
         
         setUserData(null);
         setStoreData(null);
+        setStoresList([]);
         setShowPaymentSetup(false);
       }
     } finally {
@@ -99,9 +169,12 @@ const App = () => {
       storage.removeItem('userToken');
       storage.removeItem('userData');
       storage.removeItem('storeData');
+      storage.removeItem('storesList');
+      storage.removeItem('activeStoreId');
       
       setUserData(null);
       setStoreData(null);
+      setStoresList([]);
       setShowPaymentSetup(false);
       setInitializing(false);
     }
@@ -191,6 +264,8 @@ const App = () => {
           status={userData.approvalStatus} 
           userData={userData}
           storeData={storeData}
+          storesList={storesList}
+          onSelectStore={handleSelectStore}
           onApproved={handleApprovedAdvance}
           onLogout={handleLogout}
           onSetupPayments={handleSetupPaymentsAdvance}
@@ -215,6 +290,13 @@ const App = () => {
       <HomeScreen 
         userData={userData} 
         storeData={storeData} 
+        storesList={storesList}
+        onSelectStore={handleSelectStore}
+        onRefreshStores={() => {
+          if (auth().currentUser) {
+            fetchOwnerProfileAndStore(auth().currentUser!);
+          }
+        }}
         onLogout={handleLogout}
       />
     );
@@ -238,7 +320,7 @@ const styles = StyleSheet.create({
   },
   splashText: {
     marginTop: 15,
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: Fonts.medium,
     color: Colors.textSecondary,
   },

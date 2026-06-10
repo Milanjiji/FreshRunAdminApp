@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     marginLeft: -5,
   },
   backText: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.medium,
     color: Colors.primary,
     marginLeft: 4,
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Fonts.semiBold,
     color: Colors.text,
     marginBottom: 8,
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.regular,
     color: Colors.text,
   },
@@ -311,13 +311,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   infoTitle: {
-    fontSize: 15,
+    fontSize: 13.5,
     fontFamily: Fonts.bold,
     color: Colors.text,
     marginLeft: 8,
   },
   infoDescription: {
-    fontSize: 13,
+    fontSize: 11.5,
     fontFamily: Fonts.regular,
     color: Colors.textSecondary,
     lineHeight: 18,
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   uploadText: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Fonts.medium,
     color: Colors.textLight,
   },
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
   },
   removeImageText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 10.5,
     fontFamily: Fonts.medium,
     marginLeft: 6,
   },

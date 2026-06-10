@@ -931,7 +931,7 @@ const styles = StyleSheet.create({
     marginLeft: -5,
   },
   backText: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.medium,
     color: Colors.primary,
     marginLeft: 4,
@@ -940,7 +940,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   stepperText: {
-    fontSize: 13,
+    fontSize: 11,
     fontFamily: Fonts.bold,
     color: Colors.textSecondary,
     marginBottom: 6,
@@ -971,7 +971,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Fonts.semiBold,
     color: Colors.text,
     marginBottom: 8,
@@ -982,7 +982,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     paddingHorizontal: 15,
     height: 56,
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.regular,
     color: Colors.text,
     backgroundColor: Colors.white,
@@ -998,7 +998,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   countryCode: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.medium,
     color: Colors.text,
     marginRight: 10,
@@ -1008,7 +1008,7 @@ const styles = StyleSheet.create({
   },
   phoneInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.regular,
     color: Colors.text,
   },
@@ -1023,7 +1023,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   uploadText: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Fonts.medium,
     color: Colors.textLight,
   },
@@ -1054,7 +1054,7 @@ const styles = StyleSheet.create({
   },
   removeImageText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 10.5,
     fontFamily: Fonts.medium,
     marginLeft: 6,
   },
@@ -1073,7 +1073,7 @@ const styles = StyleSheet.create({
   },
   nextButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.bold,
   },
   categoryPickerContainer: {
@@ -1094,7 +1094,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   categoryBadgeText: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Fonts.medium,
     color: Colors.textSecondary,
   },
@@ -1113,7 +1113,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   otpInput: {
-    fontSize: 24,
+    fontSize: 20,
     fontFamily: Fonts.bold,
     color: Colors.text,
     letterSpacing: 8,
@@ -1127,17 +1127,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   resendTimerText: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Fonts.medium,
     color: Colors.textLight,
   },
   resendLinkText: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Fonts.bold,
     color: Colors.primary,
   },
   changePhoneText: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Fonts.medium,
     color: Colors.secondary,
   },
@@ -1184,7 +1184,7 @@ const styles = StyleSheet.create({
   },
   mapConfirmButtonText: {
     fontFamily: Fonts.bold,
-    fontSize: 16,
+    fontSize: 14,
     color: Colors.white,
   },
   centerMarkerContainer: {
@@ -1227,7 +1227,7 @@ const styles = StyleSheet.create({
   },
   locationSelectorText: {
     fontFamily: Fonts.medium,
-    fontSize: 14,
+    fontSize: 12,
     color: Colors.primary,
   },
 });

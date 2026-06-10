@@ -288,17 +288,17 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   flag: {
-    fontSize: 18,
+    fontSize: 15,
     marginRight: 5,
   },
   countryCode: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.medium,
     color: Colors.text,
   },
   textInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.regular,
     color: Colors.text,
   },
@@ -309,17 +309,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   timerText: {
-    fontSize: 13,
+    fontSize: 11,
     fontFamily: Fonts.medium,
     color: Colors.textLight,
   },
   resendLink: {
-    fontSize: 13,
+    fontSize: 11,
     fontFamily: Fonts.bold,
     color: Colors.primary,
   },
   changeNumberLink: {
-    fontSize: 13,
+    fontSize: 11,
     fontFamily: Fonts.medium,
     color: Colors.secondary,
   },
@@ -340,12 +340,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   footerText: {
-    fontSize: 14,
+    fontSize: 12.5,
     fontFamily: Fonts.regular,
     color: Colors.textSecondary,
   },
   linkText: {
-    fontSize: 14,
+    fontSize: 12.5,
     fontFamily: Fonts.bold,
     color: Colors.primary,
     textDecorationLine: 'underline',

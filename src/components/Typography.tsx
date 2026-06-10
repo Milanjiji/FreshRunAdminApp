@@ -21,17 +21,17 @@ export const PageSubtitle: React.FC<TextProps> = ({ style, children, ...props })
 
 const styles = StyleSheet.create({
   pageTitle: {
-    fontSize: 32,
+    fontSize: 26,
     fontFamily: Fonts.black,
     fontWeight: '900',
     color: Colors.text,
     marginBottom: 10,
   },
   pageSubtitle: {
-    fontSize: 16,
+    fontSize: 13,
     fontFamily: Fonts.semiBold,
     fontWeight: '600',
     color: Colors.textSecondary,
-    lineHeight: 24,
+    lineHeight: 20,
   },
 });

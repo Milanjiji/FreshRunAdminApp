@@ -111,18 +111,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 20,
+    fontSize: 16,
     fontFamily: Fonts.bold,
     color: Colors.text,
     textAlign: 'center',
     marginBottom: 10,
   },
   message: {
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: Fonts.regular,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 18,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     borderLeftColor: Colors.divider,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.semiBold,
     color: Colors.primary,
   },

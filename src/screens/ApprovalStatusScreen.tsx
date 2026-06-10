@@ -30,6 +30,8 @@ interface ApprovalStatusScreenProps {
   status: 'pending' | 'approved' | 'rejected';
   userData: any;
   storeData: any;
+  storesList?: any[];
+  onSelectStore?: (store: any) => void;
   onApproved: () => void;
   onLogout: () => void;
   onSetupPayments: () => void;
@@ -39,6 +41,8 @@ const ApprovalStatusScreen: React.FC<ApprovalStatusScreenProps> = ({
   status: initialStatus, 
   userData,
   storeData: initialStoreData,
+  storesList,
+  onSelectStore,
   onApproved, 
   onLogout,
   onSetupPayments 
@@ -179,6 +183,34 @@ const ApprovalStatusScreen: React.FC<ApprovalStatusScreenProps> = ({
               : 'Store is ready to accept orders!'}
           </PageSubtitle>
 
+          {/* Store Switcher to switch back or check other stores */}
+          {storesList && storesList.length > 1 && onSelectStore && (
+            <View style={styles.switcherContainer}>
+              <Text style={styles.switcherLabel}>Switch Store:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.switcherList}>
+                {storesList.map((store) => (
+                  <TouchableOpacity
+                    key={store.id}
+                    style={[
+                      styles.storeSwitchBtn,
+                      store.id === storeState?.id && styles.activeStoreSwitchBtn,
+                    ]}
+                    onPress={() => onSelectStore(store)}
+                  >
+                    <Text
+                      style={[
+                        styles.storeSwitchText,
+                        store.id === storeState?.id && styles.activeStoreSwitchText,
+                      ]}
+                    >
+                      {store.name} {store.approval_status !== 'approved' ? '⏳' : '✅'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           <View style={styles.pollingBadge}>
             {isChecking ? (
               <ActivityIndicator size="small" color={Colors.primary} style={{ marginRight: 6 }} />
@@ -302,16 +334,16 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontFamily: Fonts.black,
     color: Colors.text,
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: Fonts.medium,
     color: Colors.textSecondary,
-    lineHeight: 22,
+    lineHeight: 18,
   },
   pollingBadge: {
     flexDirection: 'row',
@@ -326,7 +358,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   pollingText: {
-    fontSize: 11,
+    fontSize: 9.5,
     fontFamily: Fonts.bold,
     color: Colors.primary,
     textTransform: 'uppercase',
@@ -369,7 +401,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.error,
   },
   stageNumber: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.bold,
     color: Colors.textLight,
   },
@@ -389,7 +421,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   stageTitle: {
-    fontSize: 17,
+    fontSize: 15,
     fontFamily: Fonts.bold,
     marginBottom: 4,
   },
@@ -403,10 +435,10 @@ const styles = StyleSheet.create({
     color: Colors.error,
   },
   stageDescription: {
-    fontSize: 13,
+    fontSize: 11.5,
     fontFamily: Fonts.regular,
     color: Colors.textSecondary,
-    lineHeight: 18,
+    lineHeight: 16,
   },
   rejectedContainer: {
     padding: 20,
@@ -419,15 +451,15 @@ const styles = StyleSheet.create({
   },
   rejectedTitle: {
     color: Colors.error,
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.bold,
     marginBottom: 4,
   },
   rejectedText: {
     color: Colors.error,
-    fontSize: 14,
+    fontSize: 12.5,
     fontFamily: Fonts.medium,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   footer: {
     paddingBottom: 35,
@@ -444,7 +476,7 @@ const styles = StyleSheet.create({
   },
   refreshBtnText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.bold,
   },
   logoutBtn: {
@@ -458,12 +490,47 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   logoutBtnText: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.bold,
     color: Colors.textSecondary,
   },
   disabledBtn: {
     opacity: 0.7,
+  },
+  switcherContainer: {
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  switcherLabel: {
+    fontSize: 10.5,
+    fontFamily: Fonts.bold,
+    color: Colors.textSecondary,
+    marginBottom: 8,
+  },
+  switcherList: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  storeSwitchBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.white,
+  },
+  activeStoreSwitchBtn: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight + '20',
+  },
+  storeSwitchText: {
+    fontSize: 10.5,
+    fontFamily: Fonts.medium,
+    color: Colors.textSecondary,
+  },
+  activeStoreSwitchText: {
+    fontFamily: Fonts.bold,
+    color: Colors.primaryDark,
   },
 });
 

@@ -12,37 +12,67 @@ import {
   ScrollView,
   RefreshControl,
   StatusBar,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ShoppingBag, Tag, IndianRupee, LogOut, Power, Check, X, AlertCircle } from 'lucide-react-native';
+import { ShoppingBag, Tag, IndianRupee, LogOut, Power, Check, X, AlertCircle, Plus, ChevronDown, Pencil, Trash2, Store } from 'lucide-react-native';
 import axios from 'axios';
+import { io } from 'socket.io-client';
 import { Colors } from '../theme/colors';
 import { Fonts } from '../theme/typography';
 import { storage } from '../utils/storage';
 import { Alertt } from '../components/Alertt';
 import { API_BASE_URL } from '../config/api';
+import { AddEditProductModal } from '../components/AddEditProductModal';
+import { CreateStoreModal } from '../components/CreateStoreModal';
 
 interface HomeScreenProps {
   userData: any;
   storeData: any;
+  storesList: any[];
+  onSelectStore: (store: any) => void;
+  onRefreshStores: () => void;
   onLogout: () => void;
 }
 
-const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialStore, onLogout }) => {
+const HomeScreen: React.FC<HomeScreenProps> = ({ 
+  userData, 
+  storeData, 
+  storesList, 
+  onSelectStore, 
+  onRefreshStores, 
+  onLogout 
+}) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'earnings'>('orders');
-  const [store, setStore] = useState(initialStore);
-  const [isStoreActive, setIsStoreActive] = useState(initialStore?.is_active);
+  const [store, setStore] = useState(storeData);
+  const [isStoreActive, setIsStoreActive] = useState(storeData?.is_active);
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [earnings, setEarnings] = useState({ withdrawable: 0, total: 0 });
   
+  // Modal visibility states
+  const [showStoreSwitcher, setShowStoreSwitcher] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [showCreateStoreModal, setShowCreateStoreModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [loadingStoreToggle, setLoadingStoreToggle] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Sync state with parent storeData updates
+  useEffect(() => {
+    if (storeData) {
+      setStore(storeData);
+      setIsStoreActive(storeData.is_active);
+    }
+  }, [storeData]);
 
   // Fetch Store Status & Profile
   const fetchStoreDetails = useCallback(async () => {
+    if (!store?.id) return;
     try {
       const response = await axios.get(`${API_BASE_URL}/stores/${store.id}`);
       if (response.data.success && response.data.data) {
@@ -52,7 +82,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
     } catch (err) {
       console.log('Error fetching store details:', err);
     }
-  }, [store.id]);
+  }, [store?.id]);
 
   // Fetch Wallet & Earnings info
   const fetchEarnings = useCallback(async () => {
@@ -74,6 +104,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
 
   // Fetch Store Orders
   const fetchOrders = useCallback(async (showLoader = true) => {
+    if (!store?.id) return;
     if (showLoader) setLoadingOrders(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/orders`);
@@ -87,10 +118,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
     } finally {
       if (showLoader) setLoadingOrders(false);
     }
-  }, [store.id]);
+  }, [store?.id]);
 
   // Fetch Store Products
   const fetchProducts = useCallback(async (showLoader = true) => {
+    if (!store?.id) return;
     if (showLoader) setLoadingProducts(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/products?store_id=${store.id}&include_inactive=true`);
@@ -102,7 +134,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
     } finally {
       if (showLoader) setLoadingProducts(false);
     }
-  }, [store.id]);
+  }, [store?.id]);
 
   // Initialize screen data
   useEffect(() => {
@@ -111,6 +143,103 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
     fetchOrders();
     fetchProducts();
   }, [fetchStoreDetails, fetchEarnings, fetchOrders, fetchProducts]);
+
+  // Socket.IO Connection for Real-Time Order Alerts
+  useEffect(() => {
+    if (!store?.id) return;
+
+    console.log('[HomeScreen] Socket client connecting to:', API_BASE_URL);
+    const socket = io(API_BASE_URL);
+
+    socket.on('connect', () => {
+      console.log('[HomeScreen] Socket connected. Joining store room:', `store_${store.id}`);
+      socket.emit('join_room', `store_${store.id}`);
+    });
+
+    socket.on('new_order', (order: any) => {
+      console.log('[HomeScreen] Socket new_order received:', order);
+      Alertt.alert(
+        '🛍️ New Order Received!',
+        `Order #${order.id.substring(0, 8).toUpperCase()} for ₹${order.total_amount} has been placed at your store.`,
+        [
+          { text: 'View Orders', onPress: () => { setActiveTab('orders'); fetchOrders(false); } }
+        ]
+      );
+      fetchOrders(false);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('[HomeScreen] Socket disconnected.');
+    });
+
+    return () => {
+      console.log('[HomeScreen] Disconnecting socket.');
+      socket.disconnect();
+    };
+  }, [store?.id, fetchOrders]);
+
+  const handleSaveProduct = async (productPayload: any) => {
+    setIsProcessing(true);
+    try {
+      const token = storage.getString('userToken');
+      if (editingProduct) {
+        // Update
+        const res = await axios.patch(`${API_BASE_URL}/products/${editingProduct.id}`, productPayload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data.success) {
+          Alertt.alert('Success', 'Product updated successfully.');
+          fetchProducts(false);
+        }
+      } else {
+        // Create
+        const res = await axios.post(`${API_BASE_URL}/products`, {
+          ...productPayload,
+          storeId: store.id
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data.success) {
+          Alertt.alert('Success', 'Product created successfully.');
+          fetchProducts(false);
+        }
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    Alertt.alert(
+      'Delete Product',
+      'Are you sure you want to delete this product? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setIsProcessing(true);
+            try {
+              const token = storage.getString('userToken');
+              const res = await axios.delete(`${API_BASE_URL}/products/${productId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              if (res.data.success) {
+                Alertt.alert('Success', 'Product deleted successfully.');
+                fetchProducts(false);
+              }
+            } catch (err) {
+              console.log('Failed to delete product:', err);
+              Alertt.alert('Error', 'Failed to delete product.');
+            } finally {
+              setIsProcessing(false);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   // Handle Pull-to-refresh
   const handleRefresh = async () => {
@@ -127,6 +256,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
   // Toggle Store Availability
   const handleToggleStore = async () => {
     setLoadingStoreToggle(true);
+    setIsProcessing(true);
     const newStatus = !isStoreActive;
     try {
       const response = await axios.patch(`${API_BASE_URL}/stores/${store.id}`, {
@@ -141,11 +271,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
       Alertt.alert('Error', 'Failed to toggle store availability.');
     } finally {
       setLoadingStoreToggle(false);
+      setIsProcessing(false);
     }
   };
 
-  // Update Order Status (Accept, Prepare, Ready)
-  const handleUpdateOrderStatus = async (orderId: string, nextStatus: 'preparing' | 'ready' | 'cancelled') => {
+  // Update Order Status (Accept, Prepare, Ready, Pack, Decline)
+  const handleUpdateOrderStatus = async (orderId: string, nextStatus: 'preparing' | 'packed' | 'ready' | 'declined') => {
+    setIsProcessing(true);
     try {
       const response = await axios.patch(`${API_BASE_URL}/orders/${orderId}`, {
         status: nextStatus
@@ -157,11 +289,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
     } catch (err) {
       console.error('Update Order Status Error:', err);
       Alertt.alert('Error', 'Failed to update order status.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   // Toggle Product Availability
   const handleToggleProduct = async (productId: string, currentStatus: boolean) => {
+    setIsProcessing(true);
     try {
       const response = await axios.patch(`${API_BASE_URL}/products/${productId}`, {
         isActive: !currentStatus
@@ -172,12 +307,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
     } catch (err) {
       console.error('Toggle Product Error:', err);
       Alertt.alert('Error', 'Failed to toggle product status.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   // Update Product Stock count
   const handleUpdateProductStock = async (productId: string, newStock: number) => {
     if (isNaN(newStock) || newStock < 0) return;
+    setIsProcessing(true);
     try {
       const response = await axios.patch(`${API_BASE_URL}/products/${productId}`, {
         stockQuantity: newStock
@@ -187,13 +325,43 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
       }
     } catch (err) {
       console.error('Update Stock Error:', err);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   // Render Order Item Card
   const renderOrderItem = ({ item }: { item: any }) => {
-    const isPlaced = item.status === 'placed';
+    const isPlaced = item.status === 'placed' || item.status === 'pending';
     const isPreparing = item.status === 'preparing';
+    const isPacked = item.status === 'packed';
+    const isCompleted = item.status === 'delivered' || item.status === 'declined' || item.status === 'cancelled';
+
+    if (isCompleted) {
+      return (
+        <View style={[styles.card, { paddingVertical: 12 }]}>
+          <View style={[styles.cardHeader, { marginBottom: 0 }]}>
+            <View>
+              <Text style={styles.orderIdText}>Order #{item.id.substring(0, 8).toUpperCase()}</Text>
+              <Text style={styles.timeText}>{new Date(item.created_at).toLocaleTimeString()}</Text>
+            </View>
+            <View style={[styles.statusBadge, 
+              item.status === 'delivered' && { backgroundColor: Colors.success + '15' },
+              item.status === 'declined' && { backgroundColor: Colors.error + '15' },
+              item.status === 'cancelled' && { backgroundColor: Colors.error + '15' }
+            ]}>
+              <Text style={[styles.statusText,
+                item.status === 'delivered' && { color: Colors.success },
+                item.status === 'declined' && { color: Colors.error },
+                item.status === 'cancelled' && { color: Colors.error }
+              ]}>
+                {item.status.toUpperCase()}
+              </Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
     
     return (
       <View style={styles.card}>
@@ -203,22 +371,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
             <Text style={styles.timeText}>{new Date(item.created_at).toLocaleTimeString()}</Text>
           </View>
           <View style={[styles.statusBadge, 
-            item.status === 'placed' && { backgroundColor: Colors.warning + '15' },
+            (item.status === 'placed' || item.status === 'pending') && { backgroundColor: Colors.warning + '15' },
             item.status === 'preparing' && { backgroundColor: Colors.secondaryLight },
-            item.status === 'ready' && { backgroundColor: Colors.primaryLight + '30' },
-            item.status === 'delivered' && { backgroundColor: Colors.success + '15' }
+            item.status === 'packed' && { backgroundColor: Colors.primaryLight + '30' },
+            item.status === 'ready' && { backgroundColor: Colors.primaryLight + '50' }
           ]}>
             <Text style={[styles.statusText,
-              item.status === 'placed' && { color: Colors.warning },
+              (item.status === 'placed' || item.status === 'pending') && { color: Colors.warning },
               item.status === 'preparing' && { color: Colors.secondary },
-              item.status === 'ready' && { color: Colors.primaryDark },
-              item.status === 'delivered' && { color: Colors.success }
+              item.status === 'packed' && { color: Colors.primaryDark },
+              item.status === 'ready' && { color: Colors.primaryDark }
             ]}>
               {item.status.toUpperCase()}
             </Text>
           </View>
         </View>
-
+ 
         {/* Order Items */}
         <View style={styles.itemsList}>
           {item.items && item.items.map((prod: any, idx: number) => (
@@ -227,9 +395,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
             </Text>
           ))}
         </View>
-
+ 
         <View style={styles.cardDivider} />
-
+ 
         <View style={styles.cardFooter}>
           <Text style={styles.priceText}>Total Amount: ₹{item.total_amount}</Text>
           
@@ -238,28 +406,37 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
             {isPlaced && (
               <>
                 <TouchableOpacity 
-                  style={[styles.smallBtn, styles.declineBtn]}
-                  onPress={() => handleUpdateOrderStatus(item.id, 'cancelled')}
+                  style={styles.squareDeclineBtn}
+                  onPress={() => handleUpdateOrderStatus(item.id, 'declined')}
                 >
-                  <X size={16} color={Colors.error} />
-                  <Text style={[styles.btnText, { color: Colors.error }]}>Decline</Text>
+                  <X size={14} color={Colors.error} />
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.smallBtn, styles.acceptBtn]}
                   onPress={() => handleUpdateOrderStatus(item.id, 'preparing')}
                 >
-                  <Check size={16} color={Colors.white} />
+                  <Check size={14} color={Colors.white} />
                   <Text style={[styles.btnText, { color: Colors.white }]}>Accept</Text>
                 </TouchableOpacity>
               </>
             )}
-
+ 
             {isPreparing && (
               <TouchableOpacity 
-                style={[styles.smallBtn, styles.acceptBtn, { width: 140 }]}
+                style={[styles.smallBtn, styles.acceptBtn]}
+                onPress={() => handleUpdateOrderStatus(item.id, 'packed')}
+              >
+                <Check size={14} color={Colors.white} />
+                <Text style={[styles.btnText, { color: Colors.white }]}>Mark Packed</Text>
+              </TouchableOpacity>
+            )}
+ 
+            {isPacked && (
+              <TouchableOpacity 
+                style={[styles.smallBtn, styles.acceptBtn]}
                 onPress={() => handleUpdateOrderStatus(item.id, 'ready')}
               >
-                <Check size={16} color={Colors.white} />
+                <Check size={14} color={Colors.white} />
                 <Text style={[styles.btnText, { color: Colors.white }]}>Food Ready</Text>
               </TouchableOpacity>
             )}
@@ -319,6 +496,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
             {item.is_active ? 'In Stock' : 'Disabled'}
           </Text>
         </View>
+
+        {/* Edit / Delete Actions */}
+        <View style={styles.productActions}>
+          <TouchableOpacity
+            style={styles.actionIconBtn}
+            onPress={() => {
+              setEditingProduct(item);
+              setShowProductModal(true);
+            }}
+          >
+            <Pencil size={18} color={Colors.secondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionIconBtn}
+            onPress={() => handleDeleteProduct(item.id)}
+          >
+            <Trash2 size={18} color={Colors.error} />
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -327,13 +523,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
       
-      {/* Header Panel */}
+      {/* Header Panel with Store Selector */}
       <View style={styles.header}>
         <View style={styles.storeHeader}>
-          <View>
-            <Text style={styles.storeTitle}>{store.name}</Text>
-            <Text style={styles.ownerSubtitle}>Logged in as {userData.fullName || 'Owner'}</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.storeSelectorBtn}
+            onPress={() => setShowStoreSwitcher(true)}
+          >
+            <View>
+              <View style={styles.titleRow}>
+                <Text style={styles.storeTitle}>{store?.name || 'Select Store'}</Text>
+                <ChevronDown size={18} color={Colors.text} style={{ marginLeft: 6, marginTop: 4 }} />
+              </View>
+              <Text style={styles.ownerSubtitle}>Logged in as {userData.fullName || 'Owner'}</Text>
+            </View>
+          </TouchableOpacity>
           
           {/* Availability Switch */}
           <TouchableOpacity 
@@ -400,22 +604,34 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
         )}
 
         {activeTab === 'products' && (
-          <FlatList
-            data={products}
-            renderItem={renderProductItem}
-            keyExtractor={item => item.id}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-            ListEmptyComponent={
-              !loadingProducts ? (
-                <View style={styles.emptyContainer}>
-                  <Tag size={48} color={Colors.textLight} style={{ marginBottom: 12 }} />
-                  <Text style={styles.emptyText}>No menu items found.</Text>
-                </View>
-              ) : null
-            }
-            ListHeaderComponent={loadingProducts ? <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} /> : null}
-            contentContainerStyle={styles.listContainer}
-          />
+          <View style={{ flex: 1 }}>
+            <TouchableOpacity 
+              style={styles.addProductBtn}
+              onPress={() => {
+                setEditingProduct(null);
+                setShowProductModal(true);
+              }}
+            >
+              <Plus size={18} color={Colors.white} />
+              <Text style={styles.addProductBtnText}>Add Product Item</Text>
+            </TouchableOpacity>
+            <FlatList
+              data={products}
+              renderItem={renderProductItem}
+              keyExtractor={item => item.id}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+              ListEmptyComponent={
+                !loadingProducts ? (
+                  <View style={styles.emptyContainer}>
+                    <Tag size={48} color={Colors.textLight} style={{ marginBottom: 12 }} />
+                    <Text style={styles.emptyText}>No menu items found.</Text>
+                  </View>
+                ) : null
+              }
+              ListHeaderComponent={loadingProducts ? <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} /> : null}
+              contentContainerStyle={styles.listContainer}
+            />
+          </View>
         )}
 
         {activeTab === 'earnings' && (
@@ -445,6 +661,111 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ userData, storeData: initialSto
           </ScrollView>
         )}
       </View>
+
+      {/* Add / Edit Product Modal */}
+      <AddEditProductModal
+        visible={showProductModal}
+        onClose={() => {
+          setShowProductModal(false);
+          setEditingProduct(null);
+        }}
+        onSave={handleSaveProduct}
+        product={editingProduct}
+      />
+
+      {/* Create Store Modal */}
+      <CreateStoreModal
+        visible={showCreateStoreModal}
+        onClose={() => setShowCreateStoreModal(false)}
+        userData={userData}
+        onSuccess={async () => {
+          await onRefreshStores();
+        }}
+      />
+
+      {/* Store Switcher Modal */}
+      <Modal
+        visible={showStoreSwitcher}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowStoreSwitcher(false)}
+      >
+        <View style={styles.switcherOverlay}>
+          <View style={styles.switcherContent}>
+            <View style={styles.switcherHeader}>
+              <Text style={styles.switcherTitle}>Switch Store Dashboard</Text>
+              <TouchableOpacity onPress={() => setShowStoreSwitcher(false)} style={styles.switcherCloseBtn}>
+                <X size={22} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.switcherListContainer}>
+              {storesList && storesList.map((item) => {
+                const isActive = item.id === store?.id;
+                const isApproved = item.approval_status === 'approved';
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.storeOptionCard,
+                      isActive && styles.activeStoreOptionCard,
+                    ]}
+                    onPress={() => {
+                      onSelectStore(item);
+                      setShowStoreSwitcher(false);
+                    }}
+                  >
+                    <Store size={22} color={isActive ? Colors.primary : Colors.textSecondary} />
+                    <View style={styles.storeOptionDetails}>
+                      <Text style={[
+                        styles.storeOptionName,
+                        isActive && styles.activeStoreOptionName
+                      ]}>
+                        {item.name}
+                      </Text>
+                      <Text style={styles.storeOptionCategory}>
+                        {item.category.toUpperCase()} • {item.city}
+                      </Text>
+                    </View>
+                    
+                    <View style={[
+                      styles.badge,
+                      isApproved ? styles.approvedBadge : styles.pendingBadge
+                    ]}>
+                      <Text style={[
+                        styles.badgeText,
+                        isApproved ? styles.approvedBadgeText : styles.pendingBadgeText
+                      ]}>
+                        {item.approval_status.toUpperCase()}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* Create new store button */}
+              <TouchableOpacity
+                style={styles.createNewStoreBtn}
+                onPress={() => {
+                  setShowStoreSwitcher(false);
+                  setShowCreateStoreModal(true);
+                }}
+              >
+                <Plus size={20} color={Colors.white} style={{ marginRight: 8 }} />
+                <Text style={styles.createNewStoreBtnText}>Register A New Store</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      {isProcessing && (
+        <View style={styles.processingOverlay}>
+          <View style={styles.processingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.processingText}>Processing...</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -467,12 +788,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   storeTitle: {
-    fontSize: 22,
+    fontSize: 15,
     fontFamily: Fonts.bold,
     color: Colors.text,
   },
   ownerSubtitle: {
-    fontSize: 13,
+    fontSize: 9.5,
     fontFamily: Fonts.medium,
     color: Colors.textSecondary,
     marginTop: 2,
@@ -498,7 +819,7 @@ const styles = StyleSheet.create({
   },
   powerBtnText: {
     color: Colors.white,
-    fontSize: 13,
+    fontSize: 9.5,
     fontFamily: Fonts.bold,
   },
   tabContainer: {
@@ -520,7 +841,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.primary,
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 10.5,
     fontFamily: Fonts.semiBold,
     color: Colors.textSecondary,
   },
@@ -555,12 +876,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   orderIdText: {
-    fontSize: 15,
+    fontSize: 11.5,
     fontFamily: Fonts.bold,
     color: Colors.text,
   },
   timeText: {
-    fontSize: 12,
+    fontSize: 9,
     fontFamily: Fonts.regular,
     color: Colors.textLight,
     marginTop: 2,
@@ -571,14 +892,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 8,
     fontFamily: Fonts.bold,
   },
   itemsList: {
     marginBottom: 12,
   },
   itemText: {
-    fontSize: 14,
+    fontSize: 10.5,
     fontFamily: Fonts.medium,
     color: Colors.textSecondary,
     marginBottom: 4,
@@ -594,7 +915,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   priceText: {
-    fontSize: 15,
+    fontSize: 11.5,
     fontFamily: Fonts.bold,
     color: Colors.text,
   },
@@ -607,21 +928,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    height: 38,
-    borderRadius: 10,
-    paddingHorizontal: 12,
+    height: 30,
+    borderRadius: 8,
+    paddingHorizontal: 10,
     borderWidth: 1,
   },
   declineBtn: {
     borderColor: Colors.error + '50',
     backgroundColor: Colors.error + '10',
   },
+  squareDeclineBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.error + '40',
+    backgroundColor: Colors.error + '10',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   acceptBtn: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
   btnText: {
-    fontSize: 13,
+    fontSize: 9.5,
     fontFamily: Fonts.bold,
   },
   productCard: {
@@ -652,12 +983,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   productName: {
-    fontSize: 15,
+    fontSize: 11.5,
     fontFamily: Fonts.bold,
     color: Colors.text,
   },
   productPrice: {
-    fontSize: 13,
+    fontSize: 9.5,
     fontFamily: Fonts.semiBold,
     color: Colors.textSecondary,
     marginTop: 2,
@@ -668,7 +999,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   stockLabel: {
-    fontSize: 12,
+    fontSize: 8.5,
     fontFamily: Fonts.medium,
     color: Colors.textLight,
     marginRight: 6,
@@ -684,14 +1015,14 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   stockAdjustText: {
-    fontSize: 16,
+    fontSize: 13,
     fontFamily: Fonts.bold,
     color: Colors.text,
   },
   stockInput: {
     width: 40,
     textAlign: 'center',
-    fontSize: 13,
+    fontSize: 9.5,
     fontFamily: Fonts.bold,
     color: Colors.text,
     padding: 0,
@@ -701,7 +1032,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   toggleLabel: {
-    fontSize: 10,
+    fontSize: 7.5,
     fontFamily: Fonts.bold,
     marginTop: 4,
   },
@@ -711,7 +1042,7 @@ const styles = StyleSheet.create({
     paddingVertical: 80,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 10.5,
     fontFamily: Fonts.medium,
     color: Colors.textSecondary,
   },
@@ -728,19 +1059,19 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   balanceLabel: {
-    fontSize: 14,
+    fontSize: 10.5,
     fontFamily: Fonts.medium,
     color: Colors.textSecondary,
     marginBottom: 8,
   },
   balanceValue: {
-    fontSize: 36,
+    fontSize: 24,
     fontFamily: Fonts.black,
     color: Colors.primaryDark,
     fontWeight: '900',
   },
   totalLabel: {
-    fontSize: 12,
+    fontSize: 9,
     fontFamily: Fonts.semiBold,
     color: Colors.textLight,
     marginTop: 12,
@@ -757,7 +1088,7 @@ const styles = StyleSheet.create({
   },
   infoBoxText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 9.5,
     fontFamily: Fonts.regular,
     color: Colors.textSecondary,
     lineHeight: 18,
@@ -773,9 +1104,180 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoutText: {
-    fontSize: 15,
+    fontSize: 11.5,
     fontFamily: Fonts.bold,
     color: Colors.error,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  storeSelectorBtn: {
+    flex: 1,
+  },
+  addProductBtn: {
+    backgroundColor: '#000000', // Matches Black pill style
+    height: 52,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 15,
+    marginBottom: 5,
+    gap: 8,
+  },
+  addProductBtnText: {
+    color: Colors.white,
+    fontSize: 11.5,
+    fontFamily: Fonts.black,
+    fontWeight: '900',
+  },
+  productActions: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+    marginLeft: 12,
+    borderLeftWidth: 1,
+    borderLeftColor: Colors.border,
+    paddingLeft: 12,
+  },
+  actionIconBtn: {
+    padding: 4,
+  },
+  // Switcher overlay styles
+  switcherOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  switcherContent: {
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    maxHeight: '70%',
+    paddingBottom: 40,
+  },
+  switcherHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 25,
+    paddingVertical: 20,
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  switcherTitle: {
+    fontSize: 13.5,
+    fontFamily: Fonts.bold,
+    color: Colors.text,
+  },
+  switcherCloseBtn: {
+    padding: 4,
+  },
+  switcherListContainer: {
+    padding: 20,
+    gap: 12,
+  },
+  storeOptionCard: {
+    flexDirection: 'row',
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+  },
+  activeStoreOptionCard: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight + '10',
+  },
+  storeOptionDetails: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  storeOptionName: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bold,
+    color: Colors.text,
+  },
+  activeStoreOptionName: {
+    color: Colors.primaryDark,
+  },
+  storeOptionCategory: {
+    fontSize: 8,
+    fontFamily: Fonts.medium,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  approvedBadge: {
+    backgroundColor: Colors.success + '15',
+  },
+  pendingBadge: {
+    backgroundColor: Colors.warning + '15',
+  },
+  badgeText: {
+    fontSize: 7.5,
+    fontFamily: Fonts.bold,
+  },
+  approvedBadgeText: {
+    color: Colors.success,
+  },
+  pendingBadgeText: {
+    color: Colors.warning,
+  },
+  createNewStoreBtn: {
+    backgroundColor: '#000000', // Matches Black pill style
+    height: 56,
+    borderRadius: 15,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  createNewStoreBtnText: {
+    color: Colors.white,
+    fontSize: 11.5,
+    fontFamily: Fonts.black,
+    fontWeight: '900',
+  },
+  processingOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  processingContainer: {
+    backgroundColor: Colors.white,
+    paddingHorizontal: 30,
+    paddingVertical: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    gap: 10,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  processingText: {
+    fontSize: 12,
+    fontFamily: Fonts.bold,
+    color: Colors.text,
   },
 });
 
