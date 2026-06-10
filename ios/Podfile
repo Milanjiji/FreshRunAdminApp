@@ -5,6 +5,10 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
+ENV['RCT_BUILD_FROM_SOURCE'] = '1'
+ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
+$RNFirebaseAsStaticFramework = true
+
 platform :ios, '15.5'
 prepare_react_native_project!
 
@@ -25,6 +29,11 @@ target 'FreshRunAdmin' do
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
+  # Fix for Firebase Messaging and Auth
+  pod 'RNFBApp', :path => '../node_modules/@react-native-firebase/app'
+  pod 'RNFBMessaging', :path => '../node_modules/@react-native-firebase/messaging'
+  pod 'FirebaseAuth', :modular_headers => true
+
   post_install do |installer|
     react_native_post_install(
       installer,
@@ -32,5 +41,25 @@ target 'FreshRunAdmin' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+        config.build_settings['OTHER_CFLAGS'] = '$(inherited) -Wno-error=non-modular-include-in-framework-module'
+        
+        # Fix for FirebaseAuth-Swift.h not found
+        if target.name == 'FirebaseAuth'
+          config.build_settings['DEFINES_MODULE'] = 'YES'
+        end
+      end
+
+      if target.name.start_with?('RNFB')
+        target.build_configurations.each do |config|
+          config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+          config.build_settings['GCC_C_LANGUAGE_STANDARD'] = 'gnu17'
+        end
+      end
+    end
   end
 end
