@@ -26,14 +26,7 @@ import { storage } from '../utils/storage';
 const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dubgo0vue/image/upload";
 const UPLOAD_PRESET = "freshrun_preset";
 
-const CATEGORIES = [
-  { label: 'Restaurants', value: 'restaurants' },
-  { label: 'Street Food', value: 'street-food' },
-  { label: 'Groceries', value: 'groceries' },
-  { label: 'Chicken', value: 'chicken' },
-  { label: 'Fish', value: 'fish' },
-  { label: 'Medicine', value: 'medicine' }
-];
+
 
 interface CreateStoreModalProps {
   visible: boolean;
@@ -50,7 +43,15 @@ export const CreateStoreModal: React.FC<CreateStoreModalProps> = ({
 }) => {
   const [storeName, setStoreName] = useState('');
   const [storeDescription, setStoreDescription] = useState('');
-  const [storeCategory, setStoreCategory] = useState(CATEGORIES[0].value);
+  const [categories, setCategories] = useState<any[]>([
+    { label: 'Restaurants', value: 'restaurants' },
+    { label: 'Street Food', value: 'street-food' },
+    { label: 'Groceries', value: 'groceries' },
+    { label: 'Chicken', value: 'chicken' },
+    { label: 'Fish', value: 'fish' },
+    { label: 'Medicine', value: 'medicine' }
+  ]);
+  const [storeCategory, setStoreCategory] = useState('restaurants');
   const [storePhone, setStorePhone] = useState('');
   const [storeImage, setStoreImage] = useState<string | null>(null);
   const [houseNumber, setHouseNumber] = useState('');
@@ -80,7 +81,7 @@ export const CreateStoreModal: React.FC<CreateStoreModalProps> = ({
     if (visible) {
       setStoreName('');
       setStoreDescription('');
-      setStoreCategory(CATEGORIES[0].value);
+      setStoreCategory('restaurants');
       setStorePhone('');
       setStoreImage(null);
       setHouseNumber('');
@@ -94,6 +95,26 @@ export const CreateStoreModal: React.FC<CreateStoreModalProps> = ({
       setUpiId('');
       setUpiQrImage(null);
       setBusinessName(userData?.fullName || '');
+
+      const fetchCategories = async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/categories`);
+          const data = await response.json();
+          if (data.success && Array.isArray(data.data)) {
+            const formatted = data.data.map((cat: any) => ({
+              label: cat.name,
+              value: cat.slug
+            }));
+            setCategories(formatted);
+            if (formatted.length > 0) {
+              setStoreCategory(formatted[0].value);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch store modal categories:', err);
+        }
+      };
+      fetchCategories();
     }
   }, [visible, userData]);
 
@@ -372,7 +393,7 @@ export const CreateStoreModal: React.FC<CreateStoreModalProps> = ({
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Store Category *</Text>
               <View style={styles.categoryBadgeContainer}>
-                {CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <TouchableOpacity
                     key={cat.value}
                     style={[

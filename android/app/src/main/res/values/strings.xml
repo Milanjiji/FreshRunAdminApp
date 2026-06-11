@@ -2,6 +2,6 @@
     <string name="app_name">FreshRush Admin</string>
     <!-- Staging: qVWxqbjX-nol0kAIRHEzcCfwOa0M4yGGSh3g4g -->
     <!-- Production: TfsxK_wizBmRskvq3YC9H31Jr-ET4yGGSh3g4g -->
-    <string name="CodePushDeploymentKey" translatable="false">qVWxqbjX-nol0kAIRHEzcCfwOa0M4yGGSh3g4g</string>
+    <string name="CodePushDeploymentKey" translatable="false">TfsxK_wizBmRskvq3YC9H31Jr-ET4yGGSh3g4g</string>
     <string name="CodePushServerUrl" translatable="false">https://api.revopush.org</string>
 </resources>

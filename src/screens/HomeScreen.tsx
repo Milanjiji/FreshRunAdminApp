@@ -459,29 +459,42 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
         <View style={styles.productDetails}>
           <Text style={styles.productName}>{item.name}</Text>
-          <Text style={styles.productPrice}>₹{item.price}</Text>
+          {Array.isArray(item.variants) && item.variants.length > 0 ? (
+            <Text style={styles.productVariantsCount}>
+              {item.variants.length} Variants ({item.variants.map((v: any) => v.unit).join(', ')})
+            </Text>
+          ) : item.unit ? (
+            <Text style={styles.productUnit}>{item.unit}</Text>
+          ) : null}
+          <Text style={styles.productPrice}>
+            {Array.isArray(item.variants) && item.variants.length > 0 ? `From ₹${item.price}` : `₹${item.price}`}
+          </Text>
           
-          <View style={styles.stockRow}>
-            <Text style={styles.stockLabel}>Stock:</Text>
-            <TouchableOpacity 
-              style={styles.stockAdjustBtn} 
-              onPress={() => handleUpdateProductStock(item.id, Number(item.stock_quantity) - 1)}
-            >
-              <Text style={styles.stockAdjustText}>-</Text>
-            </TouchableOpacity>
-            <TextInput
-              style={styles.stockInput}
-              value={String(item.stock_quantity)}
-              keyboardType="number-pad"
-              onChangeText={(text) => handleUpdateProductStock(item.id, Number(text))}
-            />
-            <TouchableOpacity 
-              style={styles.stockAdjustBtn} 
-              onPress={() => handleUpdateProductStock(item.id, Number(item.stock_quantity) + 1)}
-            >
-              <Text style={styles.stockAdjustText}>+</Text>
-            </TouchableOpacity>
-          </View>
+          {Array.isArray(item.variants) && item.variants.length > 0 ? (
+            <Text style={styles.variantStockNotice}>Manage stock via edit</Text>
+          ) : (
+            <View style={styles.stockRow}>
+              <Text style={styles.stockLabel}>Stock:</Text>
+              <TouchableOpacity 
+                style={styles.stockAdjustBtn} 
+                onPress={() => handleUpdateProductStock(item.id, Number(item.stock_quantity) - 1)}
+              >
+                <Text style={styles.stockAdjustText}>-</Text>
+              </TouchableOpacity>
+              <TextInput
+                style={styles.stockInput}
+                value={String(item.stock_quantity)}
+                keyboardType="number-pad"
+                onChangeText={(text) => handleUpdateProductStock(item.id, Number(text))}
+              />
+              <TouchableOpacity 
+                style={styles.stockAdjustBtn} 
+                onPress={() => handleUpdateProductStock(item.id, Number(item.stock_quantity) + 1)}
+              >
+                <Text style={styles.stockAdjustText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Toggle availability */}
@@ -1278,6 +1291,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: Fonts.bold,
     color: Colors.text,
+  },
+  productVariantsCount: {
+    fontSize: 8.5,
+    fontFamily: Fonts.bold,
+    color: Colors.primary,
+    marginTop: 2,
+  },
+  productUnit: {
+    fontSize: 8.5,
+    fontFamily: Fonts.medium,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  variantStockNotice: {
+    fontSize: 8.5,
+    fontFamily: Fonts.medium,
+    fontStyle: 'italic',
+    color: Colors.textLight,
+    marginTop: 8,
   },
 });
 

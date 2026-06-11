@@ -34,19 +34,19 @@ interface RegistrationScreenProps {
   onRegisterSuccess: (userData: any) => void;
 }
 
-const CATEGORIES = [
-  { label: 'Restaurants', value: 'restaurants' },
-  { label: 'Street Food', value: 'street-food' },
-  { label: 'Groceries', value: 'groceries' },
-  { label: 'Chicken', value: 'chicken' },
-  { label: 'Fish', value: 'fish' },
-  { label: 'Medicine', value: 'medicine' }
-];
-
 const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegisterSuccess }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  const [categories, setCategories] = useState<any[]>([
+    { label: 'Restaurants', value: 'restaurants' },
+    { label: 'Street Food', value: 'street-food' },
+    { label: 'Groceries', value: 'groceries' },
+    { label: 'Chicken', value: 'chicken' },
+    { label: 'Fish', value: 'fish' },
+    { label: 'Medicine', value: 'medicine' }
+  ]);
 
   // --- Step 1: Owner Details ---
   const [fullName, setFullName] = useState('Milan J');
@@ -58,7 +58,29 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
   // --- Step 2: Store Details ---
   const [storeName, setStoreName] = useState('Milan Fresh Store');
   const [storeDescription, setStoreDescription] = useState('Fresh fruits and vegetables delivered directly to your doorstep.');
-  const [storeCategory, setStoreCategory] = useState(CATEGORIES[0].value);
+  const [storeCategory, setStoreCategory] = useState('restaurants');
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/categories`);
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          const formatted = data.data.map((cat: any) => ({
+            label: cat.name,
+            value: cat.slug
+          }));
+          setCategories(formatted);
+          if (formatted.length > 0 && !storeCategory) {
+            setStoreCategory(formatted[0].value);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch store registration categories:', err);
+      }
+    };
+    fetchCategories();
+  }, []);
   const [storePhone, setStorePhone] = useState('7012881004');
   const [storeImage, setStoreImage] = useState<string | null>('https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg');
   const [houseNumber, setHouseNumber] = useState('Flat 4B');
@@ -635,7 +657,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Store Category</Text>
                 <View style={styles.categoryPickerContainer}>
-                  {CATEGORIES.map((cat) => (
+                  {categories.map((cat) => (
                     <TouchableOpacity
                       key={cat.value}
                       style={[
