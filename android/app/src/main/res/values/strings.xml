@@ -4,4 +4,5 @@
     <!-- Production: TfsxK_wizBmRskvq3YC9H31Jr-ET4yGGSh3g4g -->
     <string name="CodePushDeploymentKey" translatable="false">TfsxK_wizBmRskvq3YC9H31Jr-ET4yGGSh3g4g</string>
     <string name="CodePushServerUrl" translatable="false">https://api.revopush.org</string>
+    <string name="google_maps_key">AIzaSyC1s78p6_QNfF7eoMbKnMcu5wLqOdLyN9g</string>
 </resources>
