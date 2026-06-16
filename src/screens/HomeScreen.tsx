@@ -15,7 +15,7 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ShoppingBag, Tag, IndianRupee, LogOut, Power, Check, X, AlertCircle, Plus, ChevronDown, Pencil, Trash2, Store } from 'lucide-react-native';
+import { ShoppingBag, Tag, IndianRupee, LogOut, Power, Check, X, AlertCircle, Plus, ChevronDown, Pencil, Trash2, Store, Wallet, Calendar, Clock, CheckCircle2, XCircle, Info, ArrowUpRight } from 'lucide-react-native';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import { Colors } from '../theme/colors';
@@ -49,6 +49,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [earnings, setEarnings] = useState({ withdrawable: 0, total: 0 });
+  const [withdrawalRequests, setWithdrawalRequests] = useState<any[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
+  const [withdrawalAmount, setWithdrawalAmount] = useState('');
+  const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
   
   // Modal visibility states
   const [showStoreSwitcher, setShowStoreSwitcher] = useState(false);
@@ -136,13 +141,121 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   }, [store?.id]);
 
+  const fetchWithdrawalRequests = useCallback(async () => {
+    setLoadingRequests(true);
+    try {
+      const token = storage.getString('userToken');
+      const response = await axios.get(`${API_BASE_URL}/payouts/my-requests`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) {
+        setWithdrawalRequests(response.data.requests || []);
+      }
+    } catch (err) {
+      console.log('Error fetching withdrawal requests:', err);
+    } finally {
+      setLoadingRequests(false);
+    }
+  }, []);
+
+  const handleOpenWithdrawalModal = () => {
+    const upiId = userData?.upiId || userData?.upi_id;
+    const bankAccount = userData?.bankAccountNumber || userData?.bank_account_number;
+
+    if (!upiId && !bankAccount) {
+      Alertt.alert(
+        'Setup Settlement Details',
+        'Please complete your banking/UPI details setup in your profile first to request payouts.'
+      );
+      return;
+    }
+
+    if (earnings.withdrawable <= 0) {
+      Alertt.alert(
+        'Insufficient Balance',
+        'You do not have any withdrawable earnings available at the moment.'
+      );
+      return;
+    }
+
+    setWithdrawalAmount(earnings.withdrawable.toFixed(0));
+    setShowWithdrawalModal(true);
+  };
+
+  const handleSubmitWithdrawalRequest = async () => {
+    const numericAmount = parseFloat(withdrawalAmount);
+
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      Alertt.alert('Invalid Amount', 'Please enter a valid positive withdrawal amount.');
+      return;
+    }
+
+    if (numericAmount > earnings.withdrawable) {
+      Alertt.alert(
+        'Limit Exceeded',
+        `You cannot request more than your available withdrawable balance of ₹${earnings.withdrawable.toFixed(2)}.`
+      );
+      return;
+    }
+
+    setSubmittingWithdrawal(true);
+    try {
+      const token = storage.getString('userToken');
+      const response = await axios.post(
+        `${API_BASE_URL}/payouts/request`,
+        { amount: numericAmount },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        Alertt.alert('Success', 'Your withdrawal request has been submitted to the admin for processing.');
+        setShowWithdrawalModal(false);
+        fetchEarnings();
+        fetchWithdrawalRequests();
+      } else {
+        Alertt.alert('Request Failed', response.data.error || 'Failed to submit withdrawal request.');
+      }
+    } catch (error: any) {
+      console.log('Submit request error:', error);
+      Alertt.alert('Error', error.response?.data?.error || 'Connection error. Please try again.');
+    } finally {
+      setSubmittingWithdrawal(false);
+    }
+  };
+
+  const formatWithdrawalDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch (e) {
+      return dateString;
+    }
+  };
+
   // Initialize screen data
   useEffect(() => {
     fetchStoreDetails();
     fetchEarnings();
     fetchOrders();
     fetchProducts();
-  }, [fetchStoreDetails, fetchEarnings, fetchOrders, fetchProducts]);
+    fetchWithdrawalRequests();
+  }, [fetchStoreDetails, fetchEarnings, fetchOrders, fetchProducts, fetchWithdrawalRequests]);
+
+  // Refresh data when active tab changes
+  useEffect(() => {
+    if (activeTab === 'earnings') {
+      fetchEarnings();
+      fetchWithdrawalRequests();
+    } else if (activeTab === 'orders') {
+      fetchOrders(false);
+    } else if (activeTab === 'products') {
+      fetchProducts(false);
+    }
+  }, [activeTab, fetchEarnings, fetchWithdrawalRequests, fetchOrders, fetchProducts]);
 
   // Socket.IO Connection for Real-Time Order Alerts
   useEffect(() => {
@@ -154,6 +267,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     socket.on('connect', () => {
       console.log('[HomeScreen] Socket connected. Joining store room:', `store_${store.id}`);
       socket.emit('join_room', `store_${store.id}`);
+      if (userData?.id) {
+        console.log('[HomeScreen] Joining user room:', `user_${userData.id}`);
+        socket.emit('join_room', `user_${userData.id}`);
+      }
     });
 
     socket.on('new_order', (order: any) => {
@@ -168,6 +285,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       fetchOrders(false);
     });
 
+    socket.on('payout_status_updated', (data: any) => {
+      console.log('[HomeScreen] Socket payout_status_updated received:', data);
+      Alertt.alert('Withdrawal Status Update', data.message);
+      fetchEarnings();
+      fetchWithdrawalRequests();
+    });
+
     socket.on('disconnect', () => {
       console.log('[HomeScreen] Socket disconnected.');
     });
@@ -176,7 +300,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       console.log('[HomeScreen] Disconnecting socket.');
       socket.disconnect();
     };
-  }, [store?.id, fetchOrders]);
+  }, [store?.id, userData?.id, fetchOrders, fetchEarnings, fetchWithdrawalRequests]);
 
   const handleSaveProduct = async (productPayload: any) => {
     setIsProcessing(true);
@@ -248,7 +372,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       fetchStoreDetails(),
       fetchEarnings(),
       fetchOrders(false),
-      fetchProducts(false)
+      fetchProducts(false),
+      fetchWithdrawalRequests()
     ]);
     setRefreshing(false);
   };
@@ -657,6 +782,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               <Text style={styles.balanceLabel}>Withdrawable Earnings</Text>
               <Text style={styles.balanceValue}>₹{earnings.withdrawable.toFixed(2)}</Text>
               <Text style={styles.totalLabel}>Total Lifetime Earnings: ₹{earnings.total.toFixed(2)}</Text>
+              
+              <TouchableOpacity 
+                style={[styles.withdrawBtn, earnings.withdrawable <= 0 && styles.withdrawBtnDisabled]}
+                onPress={handleOpenWithdrawalModal}
+                disabled={earnings.withdrawable <= 0}
+              >
+                <Text style={styles.withdrawBtnText}>Request Withdrawal</Text>
+                <ArrowUpRight size={14} color="#fff" />
+              </TouchableOpacity>
             </View>
 
             {/* Note about payouts */}
@@ -666,6 +800,60 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 Razorpay Route manages splits automatically at the time of payment. Withdrawable earnings represent local adjustments or commission paybacks.
               </Text>
             </View>
+
+            {/* Request History List */}
+            <Text style={styles.historySectionTitle}>Withdrawal History</Text>
+
+            {loadingRequests ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={Colors.primary} />
+                <Text style={styles.loadingText}>Fetching history...</Text>
+              </View>
+            ) : withdrawalRequests.length === 0 ? (
+              <Text style={styles.emptyHistoryText}>No withdrawal requests submitted yet.</Text>
+            ) : (
+              <View style={{ marginBottom: 16 }}>
+                {withdrawalRequests.map((item: any) => {
+                  let statusColor = '#F59E0B'; // Amber
+                  let statusLabel = 'Pending';
+                  let StatusIcon = Clock;
+
+                  if (item.status === 'approved') {
+                    statusColor = '#10B981'; // Green
+                    statusLabel = 'Paid';
+                    StatusIcon = CheckCircle2;
+                  } else if (item.status === 'rejected') {
+                    statusColor = '#EF4444'; // Red
+                    statusLabel = 'Rejected';
+                    StatusIcon = XCircle;
+                  }
+
+                  return (
+                    <View key={item.id} style={styles.historyCard}>
+                      <View style={styles.historyCardHeader}>
+                        <Text style={styles.historyAmount}>₹{parseFloat(String(item.amount)).toFixed(2)}</Text>
+                        <View style={[styles.payoutStatusBadge, { backgroundColor: `${statusColor}15` }]}>
+                          <StatusIcon size={10} color={statusColor} />
+                          <Text style={[styles.payoutStatusText, { color: statusColor }]}>{statusLabel}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.historyCardFooter}>
+                        <View style={styles.metaRow}>
+                          <Calendar size={11} color="#9CA3AF" />
+                          <Text style={styles.metaText}>{formatWithdrawalDate(item.created_at)}</Text>
+                        </View>
+                        {item.status === 'rejected' && item.rejection_reason && (
+                          <View style={styles.rejectionBox}>
+                            <Text style={styles.rejectionLabel}>Reason:</Text>
+                            <Text style={styles.rejectionReason}>{item.rejection_reason}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
 
             <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
               <LogOut size={20} color={Colors.error} style={{ marginRight: 8 }} />
@@ -771,6 +959,58 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </View>
       </Modal>
+
+      {/* Withdrawal Request Modal */}
+      <Modal
+        visible={showWithdrawalModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowWithdrawalModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Request Settlement</Text>
+            <Text style={styles.modalSub}>
+              Available balance: ₹{earnings.withdrawable.toFixed(2)}
+            </Text>
+            
+            <View style={styles.inputWrapper}>
+              <Text style={styles.currencyPrefix}>₹</Text>
+              <TextInput
+                style={styles.amountInput}
+                keyboardType="numeric"
+                value={withdrawalAmount}
+                onChangeText={setWithdrawalAmount}
+                placeholder="Enter amount"
+                placeholderTextColor={Colors.textLight}
+              />
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.cancelBtn} 
+                onPress={() => setShowWithdrawalModal(false)}
+                disabled={submittingWithdrawal}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.confirmBtn, submittingWithdrawal && { opacity: 0.7 }]} 
+                onPress={handleSubmitWithdrawalRequest}
+                disabled={submittingWithdrawal}
+              >
+                {submittingWithdrawal ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.confirmBtnText}>Submit</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {isProcessing && (
         <View style={styles.processingOverlay}>
           <View style={styles.processingContainer}>
@@ -1310,6 +1550,199 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: Colors.textLight,
     marginTop: 8,
+  },
+  // Withdrawal feature styles
+  withdrawBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    alignSelf: 'stretch',
+    marginTop: 14,
+    gap: 6,
+  },
+  withdrawBtnDisabled: {
+    backgroundColor: '#475569',
+    opacity: 0.6,
+  },
+  withdrawBtnText: {
+    fontFamily: Fonts.bold,
+    fontSize: 12,
+    color: '#fff',
+  },
+  historySectionTitle: {
+    fontFamily: Fonts.bold,
+    fontSize: 13,
+    color: Colors.text,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  loadingText: {
+    fontFamily: Fonts.medium,
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+  emptyHistoryText: {
+    fontFamily: Fonts.medium,
+    fontSize: 11,
+    color: Colors.textLight,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  historyCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 10,
+  },
+  historyCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  historyAmount: {
+    fontFamily: Fonts.black,
+    fontSize: 14,
+    color: Colors.text,
+  },
+  payoutStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 3,
+  },
+  payoutStatusText: {
+    fontFamily: Fonts.bold,
+    fontSize: 9,
+  },
+  historyCardFooter: {
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 6,
+    gap: 4,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    fontFamily: Fonts.medium,
+    fontSize: 10.5,
+    color: Colors.textSecondary,
+  },
+  rejectionBox: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 0.5,
+    borderColor: '#FEE2E2',
+    borderRadius: 6,
+    padding: 6,
+    marginTop: 2,
+  },
+  rejectionLabel: {
+    fontFamily: Fonts.bold,
+    fontSize: 9,
+    color: '#B91C1C',
+  },
+  rejectionReason: {
+    fontFamily: Fonts.medium,
+    fontSize: 9,
+    color: '#7F1D1D',
+    marginTop: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  modalTitle: {
+    fontFamily: Fonts.bold,
+    fontSize: 16,
+    color: Colors.text,
+  },
+  modalSub: {
+    fontFamily: Fonts.medium,
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 4,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginTop: 16,
+    height: 46,
+  },
+  currencyPrefix: {
+    fontFamily: Fonts.bold,
+    fontSize: 16,
+    color: Colors.text,
+    marginRight: 4,
+  },
+  amountInput: {
+    flex: 1,
+    fontFamily: Fonts.bold,
+    fontSize: 14,
+    color: Colors.text,
+    padding: 0,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+  },
+  cancelBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 40,
+  },
+  cancelBtnText: {
+    fontFamily: Fonts.bold,
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  confirmBtn: {
+    flex: 1,
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 40,
+  },
+  confirmBtnText: {
+    fontFamily: Fonts.bold,
+    fontSize: 12,
+    color: '#fff',
   },
 });
 

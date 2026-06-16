@@ -5,6 +5,7 @@ import {
   Text,
   ActivityIndicator,
   StatusBar,
+  AppState,
 } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
@@ -21,13 +22,72 @@ import PaymentOnboardingScreen from './src/screens/PaymentOnboardingScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import { API_BASE_URL } from './src/config/api';
 
-// Intercept Axios requests to inject fresh Firebase ID token
+// Helpers for token validation and injection
+const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function decodeTokenPayload(token: string) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+    let output = '';
+    
+    for (let bc = 0, bs = 0, rbuffer, idx = 0; idx < base64.length; idx++) {
+      const char = base64.charAt(idx);
+      const pos = CHARS.indexOf(char);
+      if (pos === -1) continue;
+      bs = bc % 4 ? bs * 64 + pos : pos;
+      if (bc++ % 4) {
+        rbuffer = (bs >> ((-2 * bc) & 6));
+        output += String.fromCharCode(255 & rbuffer);
+      }
+    }
+    
+    return JSON.parse(output);
+  } catch (e) {
+    return null;
+  }
+}
+
+function isTokenExpired(token: string) {
+  const payload = decodeTokenPayload(token);
+  if (!payload || !payload.exp) return true;
+  
+  const expTimeMs = payload.exp * 1000;
+  return Date.now() >= (expTimeMs - 10000);
+}
+
+// Intercept Axios requests to inject fresh Firebase ID token (proactively checks for expiration)
 axios.interceptors.request.use(async (config) => {
   if (config.url?.startsWith(API_BASE_URL)) {
     try {
       const currentUser = auth().currentUser;
       if (currentUser) {
-        const token = await currentUser.getIdToken(false);
+        let token = storage.getString('userToken') || '';
+
+        // If the token is missing or expired, fetch a fresh one before the call
+        if (!token || isTokenExpired(token)) {
+          console.log('[Axios Interceptor] Token expired or missing. Refreshing before API call...');
+          try {
+            token = await currentUser.getIdToken(true);
+            if (token) {
+              storage.setItem('userToken', token);
+            }
+          } catch (refreshErr) {
+            console.error('[Axios Interceptor] Failed to force-refresh token:', refreshErr);
+          }
+        }
+
+        // If it's valid, fetch cached token using false
+        if (token && !isTokenExpired(token)) {
+          try {
+            token = await currentUser.getIdToken(false);
+          } catch (e) {
+            // fallback to local storage token
+          }
+        }
+
         if (token) {
           config.headers = config.headers || {};
           config.headers.Authorization = `Bearer ${token}`;
@@ -214,6 +274,31 @@ const App = () => {
     const subscriber = auth().onIdTokenChanged(onIdTokenChanged);
     return subscriber; // unsubscribe on unmount
   }, [onIdTokenChanged]);
+
+  // Proactive token refresh when app transitions back to the foreground (active state)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      if (nextAppState === 'active') {
+        console.log('[Auth] App moved to foreground - proactively refreshing session...');
+        try {
+          const currentUser = auth().currentUser;
+          if (currentUser) {
+            const freshToken = await currentUser.getIdToken(true);
+            if (freshToken) {
+              storage.setItem('userToken', freshToken);
+              console.log('[Auth] Session successfully renewed proactively on foreground.');
+            }
+          }
+        } catch (err) {
+          console.warn('[Auth] Proactive session refresh failed:', err);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const handleLoginSuccess = (data: any) => {
     setUserData(data);
