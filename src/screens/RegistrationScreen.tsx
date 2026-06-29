@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,13 @@ import {
   Image,
   ActivityIndicator,
   StatusBar,
+  PermissionsAndroid,
 } from 'react-native';
 import { Alertt } from '../components/Alertt';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, ChevronLeft, Trash2, ChevronRight } from 'lucide-react-native';
+import { Camera, ChevronLeft, Trash2, ChevronRight, Locate } from 'lucide-react-native';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import Geolocation from '@react-native-community/geolocation';
 import axios from 'axios';
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -49,16 +51,16 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
   ]);
 
   // --- Step 1: Owner Details ---
-  const [fullName, setFullName] = useState('Milan J');
-  const [email, setEmail] = useState('milanjiji0987654321@gmail.com');
-  const [phoneNumber, setPhoneNumber] = useState('7012881004');
-  const [aadharNumber, setAadharNumber] = useState('123456789012');
-  const [aadharImage, setAadharImage] = useState<string | null>('https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [aadharNumber, setAadharNumber] = useState('');
+  const [aadharImage, setAadharImage] = useState<string | null>(null);
 
   // --- Step 2: Store Details ---
-  const [storeName, setStoreName] = useState('Milan Fresh Store');
-  const [storeDescription, setStoreDescription] = useState('Fresh fruits and vegetables delivered directly to your doorstep.');
-  const [storeCategory, setStoreCategory] = useState('restaurants');
+  const [storeName, setStoreName] = useState('');
+  const [storeDescription, setStoreDescription] = useState('');
+  const [storeCategory, setStoreCategory] = useState('');
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -81,14 +83,14 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
     };
     fetchCategories();
   }, []);
-  const [storePhone, setStorePhone] = useState('7012881004');
-  const [storeImage, setStoreImage] = useState<string | null>('https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg');
-  const [houseNumber, setHouseNumber] = useState('Flat 4B');
-  const [addressLine, setAddressLine] = useState('Calicut Bypass Road');
-  const [landmark, setLandmark] = useState('Near Cyberpark');
-  const [pincode, setPincode] = useState('673016');
-  const [city, setCity] = useState('Calicut');
-  const [gstNumber, setGstNumber] = useState('32ABCDE1234F1Z5');
+  const [storePhone, setStorePhone] = useState('');
+  const [storeImage, setStoreImage] = useState<string | null>(null);
+  const [houseNumber, setHouseNumber] = useState('');
+  const [addressLine, setAddressLine] = useState('');
+  const [landmark, setLandmark] = useState('');
+  const [pincode, setPincode] = useState('');
+  const [city, setCity] = useState('');
+  const [gstNumber, setGstNumber] = useState('');
   const [latitude, setLatitude] = useState(11.2588);
   const [longitude, setLongitude] = useState(75.7804);
 
@@ -103,11 +105,136 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
     setShowMap(true);
   };
 
+  const mapRef = useRef<MapView>(null);
+  const [locating, setLocating] = useState(false);
+
+  const QUICK_LOCATION_OPTIONS = {
+    enableHighAccuracy: false,
+    timeout: 8000,
+    maximumAge: 60000,
+  };
+
+  const PRECISE_LOCATION_OPTIONS = {
+    enableHighAccuracy: true,
+    timeout: 25000,
+    maximumAge: 10000,
+  };
+
+  const getCurrentPosition = (
+    options: { enableHighAccuracy: boolean; timeout: number; maximumAge: number }
+  ) =>
+    new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
+      Geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude: lat, longitude: lng } = position.coords;
+          resolve({ latitude: lat, longitude: lng });
+        },
+        reject,
+        options
+      );
+    });
+
+  const hasLocationPermission = async () => {
+    if (Platform.OS === 'ios') {
+      return true;
+    }
+
+    const hasFineLocation = await PermissionsAndroid.check(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+    );
+    const hasCoarseLocation = await PermissionsAndroid.check(
+      PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION
+    );
+
+    return hasFineLocation || hasCoarseLocation;
+  };
+
+  const requestLocationPermission = async () => {
+    if (Platform.OS === 'ios') {
+      return true;
+    }
+
+    try {
+      const alreadyGranted = await hasLocationPermission();
+      if (alreadyGranted) {
+        return true;
+      }
+
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: 'Location Permission',
+          message: 'FreshRun Admin needs access to your location to set your store location on the map.',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        }
+      );
+
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        return true;
+      }
+
+      const coarseGranted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION
+      );
+      return coarseGranted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (err) {
+      console.warn(err);
+      return false;
+    }
+  };
+
+  const handleFindMyLocation = async () => {
+    setLocating(true);
+    try {
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
+        Alertt.alert('Permission Denied', 'Location permission is required to fetch your current location.');
+        setLocating(false);
+        return;
+      }
+
+      console.log('[RegistrationScreen] Fetching current location (quick)...');
+      try {
+        const loc = await getCurrentPosition(QUICK_LOCATION_OPTIONS);
+        console.log('[RegistrationScreen] Got location (quick):', loc);
+        updateMapLocation(loc);
+      } catch (quickError) {
+        console.warn('Quick location fetch failed, trying precise GPS:', quickError);
+        try {
+          const loc = await getCurrentPosition(PRECISE_LOCATION_OPTIONS);
+          console.log('[RegistrationScreen] Got location (precise):', loc);
+          updateMapLocation(loc);
+        } catch (preciseError: any) {
+          console.error('Location Error:', preciseError);
+          Alertt.alert('Location Error', 'GPS timed out. Please make sure location services are enabled.');
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      Alertt.alert('Error', 'Failed to retrieve location.');
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const updateMapLocation = (loc: { latitude: number; longitude: number }) => {
+    setTempLatitude(loc.latitude);
+    setTempLongitude(loc.longitude);
+    mapRef.current?.animateToRegion({
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      latitudeDelta: 0.015,
+      longitudeDelta: 0.015,
+    }, 400);
+  };
+
   // --- Step 3: UPI Details ---
   const [upiId, setUpiId] = useState('');
   const [upiQrImage, setUpiQrImage] = useState<string | null>(null);
   const [qrUploading, setQrUploading] = useState(false);
-  const [businessName, setBusinessName] = useState('Milan J');
+  const [businessName, setBusinessName] = useState('');
 
   // --- Step 4: OTP Verification ---
   const [confirm, setConfirm] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
@@ -374,11 +501,13 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
           businessName
         };
 
+        // Store idToken in MMKV so the Axios interceptor automatically manages the Authorization header
+        storage.setItem('userToken', idToken);
+
         console.log('[RegistrationScreen] Submitting onboarding UPI info to backend POST /payments/onboard. Payload:', onboardPayload);
         const onboardResponse = await axios.post(
           `${API_BASE_URL}/payments/onboard`,
-          onboardPayload,
-          { headers: { Authorization: `Bearer ${idToken}` } }
+          onboardPayload
         );
         console.log('[RegistrationScreen] Razorpay onboarding response:', onboardResponse.data);
 
@@ -386,17 +515,31 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
           Alertt.alert('Success', 'Store registration submitted successfully! We are reviewing your documents.');
           
           console.log('[RegistrationScreen] Fetching freshly registered user profile from backend...');
-          const profileResponse = await axios.get(`${API_BASE_URL}/user/profile`, {
-            headers: { Authorization: `Bearer ${idToken}` }
-          });
+          const profileResponse = await axios.get(`${API_BASE_URL}/user/profile`);
           console.log('[RegistrationScreen] Fetch profile response:', profileResponse.data);
 
           if (profileResponse.data.success && profileResponse.data.user) {
-            console.log('[RegistrationScreen] [Registration Completed] Updating local session keys and dispatching success handler.');
-            storage.setItem('userToken', idToken);
+            console.log('[RegistrationScreen] [Registration Completed] Updating local session keys and waiting for auth sync...');
             storage.setItem('userData', profileResponse.data.user);
             storage.setItem('storeData', storeData);
             
+            // Wait for the Firebase SDK authentication state to synchronize on the device
+            await new Promise<void>((resolve) => {
+              const timeout = setTimeout(() => {
+                console.warn('[RegistrationScreen] onAuthStateChanged did not fire within 3s — proceeding.');
+                resolve();
+              }, 3000);
+
+              const unsubscribe = auth().onAuthStateChanged((authUser) => {
+                if (authUser) {
+                  console.log('[RegistrationScreen] onAuthStateChanged confirmed. Firebase SDK session is ready.');
+                  clearTimeout(timeout);
+                  unsubscribe();
+                  resolve();
+                }
+              });
+            });
+
             onRegisterSuccess(profileResponse.data.user);
           }
         } else {
@@ -421,6 +564,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
         {/* Map View */}
         <View style={styles.mapWrapper}>
           <MapView
+            ref={mapRef}
             provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
             style={styles.map}
             initialRegion={{
@@ -434,6 +578,20 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
               setTempLongitude(region.longitude);
             }}
           />
+          
+          {/* Floating Locate Button */}
+          <TouchableOpacity 
+            style={styles.floatingLocateButton}
+            onPress={handleFindMyLocation}
+            disabled={locating}
+            activeOpacity={0.7}
+          >
+            {locating ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : (
+              <Locate size={22} color={Colors.primary} strokeWidth={2.5} />
+            )}
+          </TouchableOpacity>
           
           {/* Centered marker pin overlay */}
           <View style={styles.centerMarkerContainer} pointerEvents="none">
@@ -735,6 +893,17 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
                   onChangeText={setPincode}
                   keyboardType="number-pad"
                   maxLength={6}
+                  placeholderTextColor={Colors.textLight}
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>City</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. Calicut"
+                  value={city}
+                  onChangeText={setCity}
                   placeholderTextColor={Colors.textLight}
                 />
               </View>
@@ -1178,6 +1347,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Platform.OS === 'ios' ? 50 : 20,
     left: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  floatingLocateButton: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 110 : 90,
+    right: 20,
     width: 48,
     height: 48,
     borderRadius: 24,

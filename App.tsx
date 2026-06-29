@@ -247,8 +247,10 @@ const App = () => {
       try {
         const token = await firebaseUser.getIdToken();
         storage.setItem('userToken', token);
-      } catch (e) {
-        console.error('Error updating refreshed token in storage:', e);
+      } catch (e: any) {
+        if (e?.code !== 'auth/no-current-user') {
+          console.error('Error updating refreshed token in storage:', e);
+        }
       }
 
       if (initializing) {
@@ -300,17 +302,57 @@ const App = () => {
     };
   }, []);
 
-  const handleLoginSuccess = (data: any) => {
+  const handleLoginSuccess = async (data: any) => {
     setUserData(data);
-    if (auth().currentUser) {
-      fetchOwnerProfileAndStore(auth().currentUser!);
+    
+    // Wait for Firebase SDK session if not already settled
+    let firebaseUser = auth().currentUser;
+    if (!firebaseUser) {
+      console.log('[App.tsx] handleLoginSuccess: Firebase session not ready. Waiting for auth state sync...');
+      firebaseUser = await new Promise<FirebaseAuthTypes.User | null>((resolve) => {
+        const timeout = setTimeout(() => resolve(null), 3000);
+        const unsub = auth().onAuthStateChanged((u) => {
+          if (u) {
+            clearTimeout(timeout);
+            unsub();
+            resolve(u);
+          }
+        });
+      });
+    }
+
+    if (firebaseUser) {
+      fetchOwnerProfileAndStore(firebaseUser);
+    } else {
+      console.warn('[App.tsx] handleLoginSuccess: Firebase session sync timed out.');
+      setInitializing(false);
     }
   };
 
-  const handleRegistrationSuccess = (data: any) => {
+  const handleRegistrationSuccess = async (data: any) => {
     setUserData(data);
-    if (auth().currentUser) {
-      fetchOwnerProfileAndStore(auth().currentUser!);
+    
+    // Wait for Firebase SDK session if not already settled
+    let firebaseUser = auth().currentUser;
+    if (!firebaseUser) {
+      console.log('[App.tsx] handleRegistrationSuccess: Firebase session not ready. Waiting for auth state sync...');
+      firebaseUser = await new Promise<FirebaseAuthTypes.User | null>((resolve) => {
+        const timeout = setTimeout(() => resolve(null), 3000);
+        const unsub = auth().onAuthStateChanged((u) => {
+          if (u) {
+            clearTimeout(timeout);
+            unsub();
+            resolve(u);
+          }
+        });
+      });
+    }
+
+    if (firebaseUser) {
+      fetchOwnerProfileAndStore(firebaseUser);
+    } else {
+      console.warn('[App.tsx] handleRegistrationSuccess: Firebase session sync timed out.');
+      setInitializing(false);
     }
     setCurrentScreen('login');
   };

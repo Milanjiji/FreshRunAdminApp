@@ -12,13 +12,12 @@
 		54DF65850DDA4F92B240019D /* Poppins-Black.ttf in Resources */ = {isa = PBXBuildFile; fileRef = EA86766F28374E4DA2B9FEEF /* Poppins-Black.ttf */; };
 		5A268C419D6347A9A0B1F266 /* Poppins-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 75792A36EFFF4251A86077DC /* Poppins-Regular.ttf */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
+		761780EE2CA45674006654EE /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 761780EF2CA45674006654EE /* GoogleService-Info.plist */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		99135B7F81524EC38F813144 /* Poppins-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 20FAC218532C4B17BE316EEB /* Poppins-Medium.ttf */; };
 		99CD9ADA4A1842A8B15CB8C9 /* Poppins-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = D3B8E6BE63334B42BB6F994A /* Poppins-SemiBold.ttf */; };
 		AEAD53B3CF324BEE9487261F /* Poppins-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 14053D4E5EA946B397D7E093 /* Poppins-Bold.ttf */; };
 		B2AC6DDDEF8DD4756FCB81AD /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
-		761780EE2CA45674006654EE /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 761780EF2CA45674006654EE /* GoogleService-Info.plist */; };
-		761780EE2CA45674006654EE /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 761780EF2CA45674006654EE /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,11 +32,11 @@
 		5DCACB8F33CDC322A6C60F78 /* libPods-FreshRunAdmin.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-FreshRunAdmin.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		75792A36EFFF4251A86077DC /* Poppins-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Poppins-Regular.ttf"; path = "../assets/fonts/Poppins-Regular.ttf"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = FreshRunAdmin/AppDelegate.swift; sourceTree = "<group>"; };
+		761780EF2CA45674006654EE /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = FreshRunAdmin/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		D3B8E6BE63334B42BB6F994A /* Poppins-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Poppins-SemiBold.ttf"; path = "../assets/fonts/Poppins-SemiBold.ttf"; sourceTree = "<group>"; };
 		EA86766F28374E4DA2B9FEEF /* Poppins-Black.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Poppins-Black.ttf"; path = "../assets/fonts/Poppins-Black.ttf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		761780EF2CA45674006654EE /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */

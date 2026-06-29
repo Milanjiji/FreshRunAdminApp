@@ -13,9 +13,10 @@ import {
   RefreshControl,
   StatusBar,
   Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ShoppingBag, Tag, IndianRupee, LogOut, Power, Check, X, AlertCircle, Plus, ChevronDown, Pencil, Trash2, Store, Wallet, Calendar, Clock, CheckCircle2, XCircle, Info, ArrowUpRight } from 'lucide-react-native';
+import { ShoppingBag, Tag, IndianRupee, LogOut, Power, Check, X, AlertCircle, Plus, ChevronDown, Pencil, Trash2, Store, Wallet, Calendar, Clock, CheckCircle2, XCircle, Info, ArrowUpRight, MoreVertical } from 'lucide-react-native';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import { Colors } from '../theme/colors';
@@ -60,6 +61,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showProductModal, setShowProductModal] = useState(false);
   const [showCreateStoreModal, setShowCreateStoreModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
 
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -400,6 +402,47 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   };
 
+  const handleDeleteAccount = () => {
+    setShowMenuDropdown(false);
+    Alertt.alert(
+      'Delete Account',
+      'Are you absolutely sure you want to delete your account? This action cannot be undone and all your data, including store details and order history, will be permanently erased.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            console.log('Attempting to delete account');
+            setIsProcessing(true);
+            try {
+              const token = storage.getString('userToken');
+              const response = await axios.delete(`${API_BASE_URL}/user/account`, {
+                data: { role: 'owner' },
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              console.log('Delete account response status:', response.status);
+              const data = response.data;
+              console.log('Delete account response data:', data);
+              if (data?.success) {
+                console.log('Account deletion succeeded, logging out');
+                onLogout(); // This will clear storage and sign out
+              } else {
+                Alertt.alert('Error', data?.error || 'Failed to delete account');
+              }
+            } catch (error: any) {
+              console.error('Delete account error:', error);
+              const errMsg = error?.response?.data?.error || 'Something went wrong. Please try again later.';
+              Alertt.alert('Error', errMsg);
+            } finally {
+              setIsProcessing(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   // Update Order Status (Accept, Prepare, Ready, Pack, Decline)
   const handleUpdateOrderStatus = async (orderId: string, nextStatus: 'preparing' | 'packed' | 'ready' | 'declined') => {
     setIsProcessing(true);
@@ -677,21 +720,31 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           </TouchableOpacity>
           
-          {/* Availability Switch */}
-          <TouchableOpacity 
-            style={[styles.powerBtn, isStoreActive ? styles.powerOn : styles.powerOff]}
-            onPress={handleToggleStore}
-            disabled={loadingStoreToggle}
-          >
-            {loadingStoreToggle ? (
-              <ActivityIndicator size="small" color={Colors.white} />
-            ) : (
-              <>
-                <Power size={18} color={Colors.white} strokeWidth={2.5} />
-                <Text style={styles.powerBtnText}>{isStoreActive ? 'Online' : 'Offline'}</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          <View style={styles.rightActions}>
+            {/* Availability Switch */}
+            <TouchableOpacity 
+              style={[styles.powerBtn, isStoreActive ? styles.powerOn : styles.powerOff]}
+              onPress={handleToggleStore}
+              disabled={loadingStoreToggle}
+            >
+              {loadingStoreToggle ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : (
+                <>
+                  <Power size={18} color={Colors.white} strokeWidth={2.5} />
+                  <Text style={styles.powerBtnText}>{isStoreActive ? 'Online' : 'Offline'}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Three Dots Menu Button */}
+            <TouchableOpacity 
+              style={styles.threeDotsBtn} 
+              onPress={() => setShowMenuDropdown(true)}
+            >
+              <MoreVertical size={20} color={Colors.text} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -958,6 +1011,28 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </ScrollView>
           </View>
         </View>
+      </Modal>
+
+      {/* 3 Dots Dropdown Menu */}
+      <Modal
+        visible={showMenuDropdown}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowMenuDropdown(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowMenuDropdown(false)}>
+          <View style={styles.menuModalOverlay}>
+            <View style={styles.menuDropdown}>
+              <TouchableOpacity style={styles.menuOption} onPress={() => { setShowMenuDropdown(false); onLogout(); }}>
+                <Text style={styles.menuOptionText}>Logout</Text>
+              </TouchableOpacity>
+              <View style={styles.menuDivider} />
+              <TouchableOpacity style={styles.menuOption} onPress={handleDeleteAccount}>
+                <Text style={[styles.menuOptionText, { color: Colors.error }]}>Delete Account</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Withdrawal Request Modal */}
@@ -1743,6 +1818,53 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bold,
     fontSize: 12,
     color: '#fff',
+  },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  threeDotsBtn: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#eeeeee50',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 80,
+    paddingRight: 20,
+  },
+  menuDropdown: {
+    backgroundColor: '#fff',
+    width: 140,
+    borderRadius: 12,
+    paddingVertical: 4,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  menuOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  menuOptionText: {
+    color: Colors.text,
+    fontSize: 13,
+    fontFamily: Fonts.medium,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: Colors.divider,
+    marginHorizontal: 8,
   },
 });
 

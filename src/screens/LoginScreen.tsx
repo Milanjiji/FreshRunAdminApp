@@ -128,6 +128,23 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onNavigateToR
         storage.setItem('userToken', idToken);
         storage.setItem('userData', userData);
 
+        // Wait for onAuthStateChanged to fire to ensure auth().currentUser is synced on App.tsx
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(() => {
+            console.warn('[LoginScreen] onAuthStateChanged did not fire within 3s — proceeding.');
+            resolve();
+          }, 3000);
+
+          const unsubscribe = auth().onAuthStateChanged((authUser) => {
+            if (authUser) {
+              console.log('[LoginScreen] onAuthStateChanged confirmed. Firebase SDK session is ready.');
+              clearTimeout(timeout);
+              unsubscribe();
+              resolve();
+            }
+          });
+        });
+
         onLoginSuccess(userData);
       } else {
         console.warn('[LoginScreen] [Access Denied] User is not registered as owner on backend. Signing out of Firebase.');
