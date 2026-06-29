@@ -22,6 +22,7 @@ import { Fonts } from '../theme/typography';
 import { Colors } from '../theme/colors';
 import { storage } from '../utils/storage';
 import { API_BASE_URL } from '../config/api';
+import axios from 'axios';
 
 const BACKEND_URL = API_BASE_URL;
 const POLL_INTERVAL_MS = 10000; // 10 seconds
@@ -57,35 +58,23 @@ const ApprovalStatusScreen: React.FC<ApprovalStatusScreenProps> = ({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const checkApprovalStatus = useCallback(async () => {
-    const token = storage.getString('userToken');
-    if (!token) return;
-
     setIsChecking(true);
     try {
-      // 1. Fetch user profile
-      const response = await fetch(`${BACKEND_URL}/user/profile`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // 1. Fetch user profile via axios — the App.tsx interceptor automatically detects
+      //    an expired token and calls getIdToken(true) before this request is sent,
+      //    preventing the flood of auth/id-token-expired errors on the backend.
+      const response = await axios.get(`${BACKEND_URL}/user/profile`);
+      const data = response.data;
 
-      const data = await response.json();
       if (data.success && data.user) {
         const newStatus = data.user.approvalStatus;
         const newRazorpayStatus = data.user.razorpay_kyc_status || 'created';
 
         setLastChecked(new Date());
 
-        // 2. Fetch store details specifically
-        const storesResponse = await fetch(`${BACKEND_URL}/stores?include_inactive=true&include_pending=true`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        const storesData = await storesResponse.json();
+        // 2. Fetch store details (public endpoint — no auth header required)
+        const storesResponse = await axios.get(`${BACKEND_URL}/stores?include_inactive=true&include_pending=true`);
+        const storesData = storesResponse.data;
         let newStoreData = null;
         if (storesData.success && storesData.data) {
           newStoreData = storesData.data.find((s: any) => s.owner_id === data.user.id);

@@ -240,6 +240,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
   const [confirm, setConfirm] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
   const [otpCode, setOtpCode] = useState('');
   const [timer, setTimer] = useState(0);
+  const [registeredToken, setRegisteredToken] = useState<string | null>(null);
 
   // Handle countdown timer for Resend OTP
   useEffect(() => {
@@ -251,6 +252,31 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
     }
     return () => clearInterval(interval);
   }, [timer]);
+
+  // Handle Firebase Auto-Verification / SMS Retriever API (Auto-login)
+  useEffect(() => {
+    if (step !== 2) return;
+
+    const unsubscribe = auth().onAuthStateChanged(async (user) => {
+      if (user) {
+        console.log('[RegistrationScreen] Auto-verification detected via onAuthStateChanged!');
+        try {
+          setLoading(true);
+          const idToken = await user.getIdToken();
+          setRegisteredToken(idToken);
+          storage.setItem('userToken', idToken);
+          console.log('[RegistrationScreen] Auto-verification token saved. Moving to Step 3 (Store Details)...');
+          setStep(3);
+        } catch (err) {
+          console.warn('[RegistrationScreen] Failed to retrieve token from auto-verified user:', err);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [step]);
 
   // Handle image pick & upload to Cloudinary
   const handleSelectImage = async (type: 'aadhar' | 'store' | 'qr') => {
@@ -319,13 +345,14 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
     }
   };
 
-  // Step 1 Validation & Owner Check (Case D)
+  // Step 1 Validation & Precheck (Case D check)
   const handleNextStep1 = async () => {
-    console.log('[RegistrationScreen] [Step 1 Validate] Full Name:', fullName, 'Email:', email, 'Phone:', phoneNumber, 'Aadhar:', aadharNumber);
+    if (loading) return;
+    console.log('[RegistrationScreen] [Step 1 Validate] Name:', fullName, 'Email:', email, 'Phone:', phoneNumber, 'Aadhar:', aadharNumber, 'AadharImg:', aadharImage);
     
     if (!fullName.trim() || !email.trim() || !phoneNumber.trim() || !aadharNumber.trim() || !aadharImage) {
-      console.warn('[RegistrationScreen] Step 1 validation failed: Empty fields');
-      Alertt.alert('Error', 'Please fill in all owner fields and upload Aadhar.');
+      console.warn('[RegistrationScreen] Step 1 validation failed: Missing fields.');
+      Alertt.alert('Error', 'Please fill in all owner details and upload Aadhar Image.');
       return;
     }
     if (phoneNumber.length !== 10) {
@@ -358,80 +385,26 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
         return;
       }
       
-      console.log('[RegistrationScreen] Phone number available. Transitioning to Step 2 (Store details)...');
-      setStep(2);
-    } catch (error: any) {
-      console.error('[RegistrationScreen] [Error] Step 1 verification failed:', error);
-      Alertt.alert('Error', 'Validation check failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Step 2 Validation
-  const handleNextStep2 = () => {
-    console.log('[RegistrationScreen] [Step 2 Validate] Store Name:', storeName, 'Phone:', storePhone, 'Address:', houseNumber, addressLine, pincode, city, 'GST:', gstNumber);
-    
-    if (!storeName.trim() || !storePhone.trim() || !houseNumber.trim() || !addressLine.trim() || !pincode.trim() || !city.trim() || !storeImage) {
-      console.warn('[RegistrationScreen] Step 2 validation failed: Missing fields.');
-      Alertt.alert('Error', 'Please fill in all store details and upload store image.');
-      return;
-    }
-    if (storePhone.length !== 10) {
-      console.warn('[RegistrationScreen] Step 2 validation failed: Store phone is not 10 digits.');
-      Alertt.alert('Error', 'Store phone number must be 10 digits.');
-      return;
-    }
-    if (gstNumber.trim() && gstNumber.trim().length !== 15) {
-      console.warn('[RegistrationScreen] Step 2 validation failed: GST is not 15 characters.');
-      Alertt.alert('Error', 'GST Number must be 15 characters.');
-      return;
-    }
-
-    // Default business name to store name
-    if (!businessName) {
-      setBusinessName(storeName);
-    }
-    
-    console.log('[RegistrationScreen] Store details valid. Transitioning to Step 3 (Bank details)...');
-    setStep(3);
-  };
-
-  // Step 3 Validation & Sending OTP (Stage 1, Step 4)
-  const handleNextStep3 = async () => {
-    console.log('[RegistrationScreen] [Step 3 Validate] UPI ID:', upiId, 'UPI QR:', upiQrImage, 'Business Name:', businessName);
-    
-    if (!upiId.trim() || !upiQrImage || !businessName.trim()) {
-      console.warn('[RegistrationScreen] Step 3 validation failed: Missing fields.');
-      Alertt.alert('Error', 'Please enter your UPI ID, upload UPI QR Code image, and enter registered name.');
-      return;
-    }
-    if (!upiId.includes('@')) {
-      console.warn('[RegistrationScreen] Step 3 validation failed: Invalid UPI ID format.');
-      Alertt.alert('Error', 'Please enter a valid UPI ID (e.g. name@okaxis)');
-      return;
-    }
-
-    setLoading(true);
-    try {
+      // Step 1 check success. Immediately send Firebase OTP before entering other screens
       const formattedPhone = `+91${phoneNumber}`;
-      console.log('[RegistrationScreen] [Step 3 Complete] Forms valid. Sending Firebase OTP to confirm phone identity:', formattedPhone);
+      console.log('[RegistrationScreen] Sending Firebase OTP to confirm identity:', formattedPhone);
       const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
       
       console.log('[RegistrationScreen] Firebase OTP sent successfully. Advancing to OTP verification step.');
       setConfirm(confirmation);
       setTimer(30);
-      setStep(4);
+      setStep(2); // Step 2 is now OTP verification
     } catch (error: any) {
-      console.error('[RegistrationScreen] [Error] Failed to send OTP for registration:', error);
-      Alertt.alert('Error', error.message || 'Failed to send verification code.');
+      console.error('[RegistrationScreen] [Error] Step 1 verification failed:', error);
+      Alertt.alert('Error', error.message || 'Validation check failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Step 4 Verification & Submission
-  const handleFinalSubmit = async () => {
+  // Step 2: Verify OTP and Authenticate (previously Step 4 verify block)
+  const handleOtpVerify = async () => {
+    if (loading) return;
     console.log('[RegistrationScreen] [OTP verification] Code entered:', otpCode);
     if (otpCode.length !== 6 || isNaN(Number(otpCode))) {
       console.warn('[RegistrationScreen] Validation failed: OTP code is invalid length.');
@@ -458,6 +431,89 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
 
       console.log('[RegistrationScreen] Fetching ID Token...');
       const idToken = await firebaseUser.getIdToken();
+      setRegisteredToken(idToken);
+      storage.setItem('userToken', idToken);
+
+      console.log('[RegistrationScreen] OTP verified and user authenticated. Proceeding to Step 3 (Store Details)...');
+      setStep(3); // Step 3 is now Store details
+    } catch (error: any) {
+      console.error('[RegistrationScreen] [Error] OTP verification failed:', error);
+      Alertt.alert('Verification Failed', error.message || 'Invalid code entered.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Resend OTP inside Step 2
+  const handleResendOtp = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const formattedPhone = `+91${phoneNumber}`;
+      console.log('[RegistrationScreen] Resending Firebase OTP:', formattedPhone);
+      const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+      setConfirm(confirmation);
+      setTimer(30);
+      Alertt.alert('OTP Sent', 'A new verification code has been sent to your phone number.');
+    } catch (error: any) {
+      console.error('[RegistrationScreen] [Error] Failed to resend OTP:', error);
+      Alertt.alert('Error', error.message || 'Failed to send verification code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 3 Validation: Store Details (previously Step 2)
+  const handleNextStepStore = () => {
+    console.log('[RegistrationScreen] [Step 3 Validate] Store Name:', storeName, 'Phone:', storePhone, 'Address:', houseNumber, addressLine, pincode, city, 'GST:', gstNumber);
+    
+    if (!storeName.trim() || !storePhone.trim() || !houseNumber.trim() || !addressLine.trim() || !pincode.trim() || !city.trim() || !storeImage) {
+      console.warn('[RegistrationScreen] Step 3 validation failed: Missing fields.');
+      Alertt.alert('Error', 'Please fill in all store details and upload store image.');
+      return;
+    }
+    if (storePhone.length !== 10) {
+      console.warn('[RegistrationScreen] Step 3 validation failed: Store phone is not 10 digits.');
+      Alertt.alert('Error', 'Store phone number must be 10 digits.');
+      return;
+    }
+    if (gstNumber.trim() && gstNumber.trim().length !== 15) {
+      console.warn('[RegistrationScreen] Step 3 validation failed: GST is not 15 characters.');
+      Alertt.alert('Error', 'GST Number must be 15 characters.');
+      return;
+    }
+
+    // Default business name to store name
+    if (!businessName) {
+      setBusinessName(storeName);
+    }
+    
+    console.log('[RegistrationScreen] Store details valid. Transitioning to Step 4 (UPI details)...');
+    setStep(4); // Step 4 is now UPI details
+  };
+
+  // Step 4 Verification & Submission (previously Step 3 & Step 4 Final Submit merged)
+  const handleFinalSubmit = async () => {
+    if (loading) return;
+    console.log('[RegistrationScreen] [Step 4 Submit] UPI ID:', upiId, 'UPI QR:', upiQrImage, 'Business Name:', businessName);
+    
+    if (!upiId.trim() || !upiQrImage || !businessName.trim()) {
+      console.warn('[RegistrationScreen] Step 4 validation failed: Missing fields.');
+      Alertt.alert('Error', 'Please enter your UPI ID, upload UPI QR Code image, and enter registered name.');
+      return;
+    }
+    if (!upiId.includes('@')) {
+      console.warn('[RegistrationScreen] Step 4 validation failed: Invalid UPI ID format.');
+      Alertt.alert('Error', 'Please enter a valid UPI ID (e.g. name@okaxis)');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const idToken = registeredToken || storage.getString('userToken');
+      if (!idToken) {
+        throw new Error('User session not found. Please verify your phone number first.');
+      }
 
       // 2. Submit Store & Owner registration payload
       const registerPayload = {
@@ -501,7 +557,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
           businessName
         };
 
-        // Store idToken in MMKV so the Axios interceptor automatically manages the Authorization header
+        // Ensure token is stored in MMKV
         storage.setItem('userToken', idToken);
 
         console.log('[RegistrationScreen] Submitting onboarding UPI info to backend POST /payments/onboard. Payload:', onboardPayload);
@@ -650,10 +706,15 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
               <ChevronLeft size={24} color={Colors.primary} strokeWidth={2.5} />
               <Text style={styles.backText}>Back to Login</Text>
             </TouchableOpacity>
-          ) : step < 4 ? (
+          ) : step <= 4 ? (
             <TouchableOpacity onPress={() => {
-              console.log(`[RegistrationScreen] Navigating back from step ${step} to ${step - 1}`);
-              setStep(step - 1);
+              console.log(`[RegistrationScreen] Navigating back from step ${step}`);
+              if (step === 3) {
+                // Going back from Store Details (Step 3) goes directly to Owner Details (Step 1)
+                setStep(1);
+              } else {
+                setStep(step - 1);
+              }
             }} style={styles.backButton}>
               <ChevronLeft size={24} color={Colors.primary} strokeWidth={2.5} />
               <Text style={styles.backText}>Back</Text>
@@ -661,11 +722,11 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
           ) : null}
 
           {/* Stepper Progress indicator */}
-          {step < 4 && (
+          {step <= 4 && (
             <View style={styles.stepperContainer}>
-              <Text style={styles.stepperText}>Step {step} of 3</Text>
+              <Text style={styles.stepperText}>Step {step} of 4</Text>
               <View style={styles.stepperBarBg}>
-                <View style={[styles.stepperBarFill, { width: `${(step / 3) * 100}%` }]} />
+                <View style={[styles.stepperBarFill, { width: `${(step / 4) * 100}%` }]} />
               </View>
             </View>
           )}
@@ -774,7 +835,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <>
-                    <Text style={styles.nextButtonText}>Next: Store Details</Text>
+                    <Text style={styles.nextButtonText}>Next: Verify Phone Number</Text>
                     <ChevronRight size={20} color="#fff" />
                   </>
                 )}
@@ -782,8 +843,52 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
             </View>
           )}
 
-          {/* Step 2: Store Details Form */}
+          {/* Step 2: OTP Verification Screen (previously Step 4) */}
           {step === 2 && (
+            <View style={styles.otpSection}>
+              <View style={styles.header}>
+                <PageTitle>Verify Number</PageTitle>
+                <PageSubtitle>We have sent a verification code to +91 {phoneNumber}</PageSubtitle>
+              </View>
+
+              <View style={styles.otpWrapper}>
+                <TextInput
+                  style={styles.otpInput}
+                  placeholder="000000"
+                  value={otpCode}
+                  onChangeText={setOtpCode}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  placeholderTextColor={Colors.textLight}
+                />
+              </View>
+
+              <PrimaryButton
+                title={loading ? "Verifying..." : "Verify & Continue"}
+                onPress={handleOtpVerify}
+                loading={loading}
+              />
+
+              <View style={styles.resendRow}>
+                {timer > 0 ? (
+                  <Text style={styles.resendTimerText}>Resend OTP in {timer}s</Text>
+                ) : (
+                  <TouchableOpacity onPress={handleResendOtp}>
+                    <Text style={styles.resendLinkText}>Resend Code</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => {
+                  console.log('[RegistrationScreen] User heading back to step 1 to edit phone.');
+                  setStep(1);
+                }}>
+                  <Text style={styles.changePhoneText}>Change phone number?</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Step 3: Store Details Form (previously Step 2) */}
+          {step === 3 && (
             <View style={styles.formSection}>
               <View style={styles.header}>
                 <PageTitle>Store Details</PageTitle>
@@ -805,7 +910,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
                 <Text style={styles.label}>Store Description</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="e.g. Fresh organic fruits and daily essentials"
+                  placeholder="Describe your store offerings"
                   value={storeDescription}
                   onChangeText={setStoreDescription}
                   placeholderTextColor={Colors.textLight}
@@ -969,15 +1074,15 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
                 )}
               </View>
 
-              <TouchableOpacity style={styles.nextButton} onPress={handleNextStep2}>
+              <TouchableOpacity style={styles.nextButton} onPress={handleNextStepStore}>
                 <Text style={styles.nextButtonText}>Next: Bank Onboarding</Text>
                 <ChevronRight size={20} color="#fff" />
               </TouchableOpacity>
             </View>
           )}
 
-          {/* Step 3: UPI Details Form */}
-          {step === 3 && (
+          {/* Step 4: UPI Details Form (previously Step 3) */}
+          {step === 4 && (
             <View style={styles.formSection}>
               <View style={styles.header}>
                 <PageTitle>Settlement Setup</PageTitle>
@@ -1042,57 +1147,10 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onBack, onRegis
               </View>
 
               <PrimaryButton
-                title={loading ? "Initiating Verification..." : "Submit & Verify Phone"}
-                onPress={handleNextStep3}
-                loading={loading}
-              />
-            </View>
-          )}
-
-          {/* Step 4: OTP Verification Screen */}
-          {step === 4 && (
-            <View style={styles.otpSection}>
-              <View style={styles.header}>
-                <PageTitle>Verify Number</PageTitle>
-                <PageSubtitle>We have sent a verification code to +91 {phoneNumber}</PageSubtitle>
-              </View>
-
-              <View style={styles.otpWrapper}>
-                <TextInput
-                  style={styles.otpInput}
-                  placeholder="000000"
-                  value={otpCode}
-                  onChangeText={setOtpCode}
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  placeholderTextColor={Colors.textLight}
-                />
-              </View>
-
-              <PrimaryButton
-                title={loading ? "Submitting..." : "Verify & Complete Onboarding"}
+                title={loading ? "Submitting Application..." : "Complete Onboarding"}
                 onPress={handleFinalSubmit}
                 loading={loading}
               />
-
-              <View style={styles.resendRow}>
-                {timer > 0 ? (
-                  <Text style={styles.resendTimerText}>Resend OTP in {timer}s</Text>
-                ) : (
-                  <TouchableOpacity onPress={() => {
-                    console.log('[RegistrationScreen] User requested OTP resend.');
-                    handleNextStep3();
-                  }}>
-                    <Text style={styles.resendLinkText}>Resend Code</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity onPress={() => {
-                  console.log('[RegistrationScreen] User heading back to step 3 to edit details.');
-                  setStep(3);
-                }}>
-                  <Text style={styles.changePhoneText}>Change Account details?</Text>
-                </TouchableOpacity>
-              </View>
             </View>
           )}
         </ScrollView>
